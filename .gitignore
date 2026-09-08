@@ -1,5 +1,14 @@
 # Rust build output
 /target/
+**/*.rs.bk
+*.pdb
 
-# Middleman's own broker state in this repository (see spec §5)
+# Middleman broker runtime state (spec 5): never committed, local-only
 /.middleman/
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+
+# OS cruft
+.DS_Store
+Thumbs.db

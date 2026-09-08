@@ -1,0 +1,23 @@
+[package]
+name = "middleman-mcp"
+description = "stdio MCP facade for Middleman (three-tool surface)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "middleman-mcp"
+path = "src/main.rs"
+
+[dependencies]
+middleman-core = { workspace = true }
+middleman-indexer = { workspace = true }
+middleman-packet = { workspace = true }
+middleman-store = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }

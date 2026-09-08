@@ -1,0 +1,12 @@
+[package]
+name = "middleman-adapters"
+description = "Optional harness-native adapters (Pi, Kilo, Cline, Claude Code, Codex)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+middleman-core = { workspace = true }
