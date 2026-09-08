@@ -20,5 +20,11 @@ time = { workspace = true }
 tracing = { workspace = true }
 ulid = { workspace = true }
 
+[[test]]
+name = "store_cli"
+path = "tests/store_cli.rs"
+harness = false
+
 [dev-dependencies]
 tempfile = { workspace = true }
+ulid = { workspace = true }
