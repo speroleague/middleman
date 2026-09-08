@@ -1,0 +1,109 @@
+# Universal Cline ignore file
+# Conservative: ignores generated, dependency, cache, secret, and artifact paths.
+# Do not add source, migrations, fixtures, docs, lockfiles, or checked-in generated code
+# without confirming that the repository does not need Cline to read it.
+
+# VCS and editor state
+.git/
+.svn/
+.hg/
+.idea/
+.vscode/.ropeproject/
+.DS_Store
+Thumbs.db
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+!.env.sample
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+service-account*.json
+
+# JavaScript / TypeScript
+node_modules/
+.npm/
+.pnpm-store/
+.yarn/
+.turbo/
+.next/
+.nuxt/
+.svelte-kit/
+.vite/
+.parcel-cache/
+
+# Rust
+target/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+.venv/
+venv/
+env/
+
+# JVM / Kotlin / Gradle
+.gradle/
+*.class
+
+# .NET
+bin/
+obj/
+
+# PHP / Composer
+vendor/
+
+# Ruby
+.bundle/
+*.gem
+
+# Go
+# Uncomment only if this repository does not commit Go vendor dependencies.
+# vendor/
+
+# Mobile / native build artifacts
+DerivedData/
+Pods/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# Test and tool artifacts
+coverage/
+.coverage
+htmlcov/
+test-results/
+playwright-report/
+allure-results/
+allure-report/
+.cache/
+tmp/
+temp/
+logs/
+*.log
+
+# Common local data and search-index artifacts
+data/
+storage/
+uploads/
+index/
+indexes/
+tantivy/
+*.sqlite
+*.sqlite3
+*.db
+
+# Build / release output. Uncomment selectively if a repository stores source here.
+dist/
+out/
+release/
+# build/
