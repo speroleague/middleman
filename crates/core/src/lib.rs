@@ -18,8 +18,10 @@ pub mod entity;
 pub mod error;
 pub mod event;
 pub mod ids;
+pub mod projection;
 
 pub use entity::{Edge, EdgeKind, Entity, EntityKind, EntityPayload, Evidence, Status};
 pub use error::Error;
 pub use event::{Actor, Claim, Event, EventKind, RetrievalSignal};
 pub use ids::{EntityId, EventId, Hash, ProjectId, ProposalId, TaskId};
+pub use projection::{ProposalRecord, ProposedClaim, RetrievalRecord, State, TaskRecord, project};
