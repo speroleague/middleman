@@ -1,4 +1,4 @@
-//! Deterministic indexing edge for Middleman.
+//! Deterministic indexing edge for `Middleman`.
 //!
 //! Six stages, each a pure function of its input: filesystem scan,
 //! document scan, language scan (regex-based in v1), Git scan, derived

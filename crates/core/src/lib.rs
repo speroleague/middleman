@@ -1,4 +1,4 @@
-//! Pure domain core of Middleman.
+//! Pure domain core of `Middleman`.
 //!
 //! This crate owns every domain type the rest of the system persists,
 //! indexes, or renders: the event model with its hash chain, the
@@ -13,3 +13,13 @@
 //!   caller-supplied input.
 //! - Pure functions in, owned types out; untrusted input is rejected at
 //!   this boundary with typed errors, never a panic.
+
+pub mod entity;
+pub mod error;
+pub mod event;
+pub mod ids;
+
+pub use entity::{Edge, EdgeKind, Entity, EntityKind, EntityPayload, Evidence, Status};
+pub use error::Error;
+pub use event::{Actor, Claim, Event, EventKind, RetrievalSignal};
+pub use ids::{EntityId, EventId, Hash, ProjectId, ProposalId, TaskId};

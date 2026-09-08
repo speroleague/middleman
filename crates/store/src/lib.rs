@@ -1,4 +1,4 @@
-//! SQLite persistence shell for Middleman.
+//! `SQLite` persistence shell for `Middleman`.
 //!
 //! Single responsibility: turn the core's event and state types into
 //! durable rows and back again. WAL mode, a bounded busy timeout, one

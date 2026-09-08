@@ -1,4 +1,4 @@
-//! stdio MCP facade for Middleman (phase 3).
+//! stdio MCP facade for `Middleman` (phase 3).
 //!
 //! Exposes exactly three tools: `middleman_prepare`, `middleman_expand`,
 //! `middleman_propose` — plus a small resource surface. No generic

@@ -1,4 +1,4 @@
-//! Context packet rendering for Middleman.
+//! Context packet rendering for `Middleman`.
 //!
 //! Turns the core's selected context into exactly three output shapes:
 //! Context IR (compact lines), Markdown, and JSON. One pipeline:
