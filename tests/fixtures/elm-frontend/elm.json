@@ -1,0 +1,13 @@
+{
+    "type": "application",
+    "source-directories": ["src"],
+    "dependencies": {
+        "elm": "1.0.8",
+        "html": "1.0.0"
+    },
+    "test-dependencies": {
+        "elm-expect": "1.0.0",
+        "elm-test": "1.0.0"
+    },
+    "elm-version": "1.0.8"
+}
