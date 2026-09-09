@@ -53,7 +53,7 @@ apply, reject) with export/import/backup/restore.
 - [x] cli: propose from-git / structured input
 - [x] cli: review, apply, reject
 - [x] cli: export, import, backup, restore
-- [ ] cli/store: standalone index command and persistent incremental snapshots
+- [x] cli/store: standalone index command and persistent incremental snapshots
 - [ ] docs: agent guide answers + phase 3-5 handoff (spec 16.2 exit)
 
 ## Changes made
@@ -93,10 +93,9 @@ apply, reject) with export/import/backup/restore.
   structured input, Git evidence, atomicity and validation. Proposal review is complete;
   see [the lifecycle handoff](010-proposal-review-lifecycle.md) for typed acceptance,
   rejection and terminal-state rules. State transfer is complete; see
-  [the transfer handoff](011-state-transfer.md). Next: standalone indexing and
-  persistent snapshots.
-  Standalone index/persistent snapshot work
-  is explicitly tracked above before final phase-exit validation.
+  [the transfer handoff](011-state-transfer.md). Indexing is complete; see
+  [the persistent-index handoff](012-persistent-index.md). Next: finish the
+  Phase 2 agent-guide answers and record the Phase 3-5 harness handoff.
 
 ## Language and Git slice
 

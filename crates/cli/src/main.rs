@@ -16,6 +16,7 @@ use middleman_core::entity::TaskStatus;
 use middleman_core::{Config, Event, EventId, Hash, ProjectId, ProposalId, TaskId, TaskRecord};
 
 mod guides;
+mod index;
 mod proposals;
 mod retrieval;
 mod tasks;
@@ -42,6 +43,8 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Commands {
+    /// Scan and persist a bounded, source-free incremental index snapshot.
+    Index(index::Options),
     /// Track task baselines, completion and reported validation.
     Task(tasks::Options),
     /// Validate and record explicit durable-memory proposals for review.
@@ -89,6 +92,8 @@ enum Failure {
     Task(#[from] tasks::Error),
     #[error("proposal: {0}")]
     Proposal(#[from] proposals::Error),
+    #[error("index: {0}")]
+    Index(#[from] index::Error),
     #[error("transfer: {0}")]
     Transfer(#[from] transfer::Error),
     #[error("guide: {0}")]
@@ -121,6 +126,7 @@ fn run(cli: &Cli) -> Result<(), Failure> {
         return Err(Failure::NotADirectory(cli.repo.clone()));
     }
     match &cli.command {
+        Commands::Index(options) => index::run(repo, options).map_err(Failure::from),
         Commands::Task(options) => tasks::run(repo, options).map_err(Failure::from),
         Commands::Propose(options) => proposals::run(repo, options).map_err(Failure::from),
         Commands::Review { id } => proposals::review(repo, id).map_err(Failure::from),
@@ -366,6 +372,7 @@ pub fn main() -> ExitCode {
                 Commands::Retrieval(_)
                     | Commands::Render(_)
                     | Commands::Task(_)
+                    | Commands::Index(_)
                     | Commands::Propose(_)
                     | Commands::Review { .. }
                     | Commands::Apply { .. }
@@ -380,6 +387,7 @@ pub fn main() -> ExitCode {
                     Failure::Guide(error) => error.code(),
                     Failure::Task(error) => error.code(),
                     Failure::Proposal(error) => error.code(),
+                    Failure::Index(error) => error.code(),
                     Failure::Transfer(error) => error.code(),
                     _ => "invalid_repository",
                 };

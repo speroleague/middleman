@@ -3,6 +3,7 @@ use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 
 use middleman_core::{EdgeKind, EntityId};
+use serde::{Deserialize, Serialize};
 
 use super::{
     Diagnostic, Error, Reason,
@@ -10,7 +11,7 @@ use super::{
 };
 use crate::language::Language;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub(super) struct Link {
     pub path: PathBuf,
     pub id: EntityId,
@@ -18,7 +19,7 @@ pub(super) struct Link {
     pub line: u32,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub(super) struct Resolution {
     pub links: Vec<Link>,
     pub diagnostics: Vec<Diagnostic>,

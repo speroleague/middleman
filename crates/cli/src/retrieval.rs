@@ -118,6 +118,12 @@ pub(super) struct Loaded {
     pub(super) snapshot: middleman_core::task::Snapshot,
 }
 
+pub(super) struct Refreshed {
+    pub(super) loaded: Loaded,
+    pub(super) index: graph::Index,
+    pub(super) changes: graph::Changes,
+}
+
 pub(super) fn guide_input(
     repo: &Path,
 ) -> Result<(String, BTreeMap<EntityId, middleman_core::Entity>), Error> {
@@ -281,10 +287,21 @@ fn check_output(output: &OutputOptions) -> Result<(), Error> {
 }
 
 fn load(repo: &Path, state: State) -> Result<Loaded, Error> {
-    task_input(repo, state, true)
+    let snapshot = Store::open_read_only(&repo.join(super::STATE_DIR))?.index_snapshot()?;
+    let previous = snapshot.and_then(|bytes| graph::Index::decode(&bytes).ok());
+    Ok(refresh_input(repo, state, true, previous.as_ref())?.loaded)
 }
 
 pub(super) fn task_input(repo: &Path, state: State, include_git: bool) -> Result<Loaded, Error> {
+    Ok(refresh_input(repo, state, include_git, None)?.loaded)
+}
+
+pub(super) fn refresh_input(
+    repo: &Path,
+    state: State,
+    include_git: bool,
+    previous: Option<&graph::Index>,
+) -> Result<Refreshed, Error> {
     let config = super::read_toml_config(&repo.join(super::STATE_DIR).join(super::CONFIG_FILE))
         .map_err(|_| Error::Config)?;
     let report = scan::scan(repo, &config)?;
@@ -295,7 +312,7 @@ pub(super) fn task_input(repo: &Path, state: State, include_git: bool) -> Result
         None
     };
     let refreshed = graph::refresh(
-        None,
+        previous,
         &report.files,
         history.as_ref(),
         &config.limits,
@@ -362,12 +379,16 @@ pub(super) fn task_input(repo: &Path, state: State, include_git: bool) -> Result
             hints.entry(id.clone()).or_default().recent_task = true;
         }
     }
-    Ok(Loaded {
-        config,
-        state,
-        graph,
-        hints,
-        snapshot,
+    Ok(Refreshed {
+        index: refreshed.index,
+        changes: refreshed.changes,
+        loaded: Loaded {
+            config,
+            state,
+            graph,
+            hints,
+            snapshot,
+        },
     })
 }
 

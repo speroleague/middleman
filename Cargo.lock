@@ -549,6 +549,8 @@ dependencies = [
  "middleman-core",
  "proptest",
  "regex",
+ "serde",
+ "serde_json",
  "tempfile",
  "thiserror",
  "time",

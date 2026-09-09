@@ -24,7 +24,7 @@ middleman-indexer = { path = "crates/indexer" }
 
 # domain core
 blake3 = "1"
-serde = { version = "1", features = ["derive"] }
+serde = { version = "1", features = ["derive", "rc"] }
 serde_json = "1"
 thiserror = "2"
 time = { version = "0.3", features = ["serde", "formatting"] }

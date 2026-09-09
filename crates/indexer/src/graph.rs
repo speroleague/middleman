@@ -9,6 +9,7 @@ use std::sync::Arc;
 
 use middleman_core::config::LimitsConfig;
 use middleman_core::{Edge, EdgeKind, Entity, EntityId, Evidence, Hash};
+use serde::{Deserialize, Serialize};
 
 use crate::{
     document, git, language,
@@ -39,28 +40,28 @@ impl Default for Budget {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum Reason {
     Missing,
     Ambiguous,
     Unsupported,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Diagnostic {
     pub source: PathBuf,
     pub line: u32,
     pub reason: Reason,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CoChange {
     pub left: EntityId,
     pub right: EntityId,
     pub evidence: Vec<Evidence>,
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Graph {
     pub entities: BTreeMap<EntityId, Entity>,
     pub edges: Vec<Edge>,
@@ -69,14 +70,14 @@ pub struct Graph {
     pub history_truncated: bool,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct Cached {
     facts: Arc<Facts>,
     resolution: Resolution,
     fragment: Arc<Fragment>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Index {
     files: BTreeMap<PathBuf, Cached>,
     graph: Graph,
@@ -86,6 +87,20 @@ pub struct Index {
 impl Index {
     pub fn graph(&self) -> &Graph {
         &self.graph
+    }
+
+    /// Serializes parsed facts and graph fragments without source-file bodies.
+    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+        serde_json::to_vec(self).map_err(|_| Error::Snapshot)
+    }
+
+    /// Decodes a cache written by this indexer version.
+    pub fn decode(bytes: &[u8]) -> Result<Self, Error> {
+        let index: Self = serde_json::from_slice(bytes).map_err(|_| Error::Snapshot)?;
+        if index.files.len() > Budget::default().max_files {
+            return Err(Error::Snapshot);
+        }
+        Ok(index)
     }
 }
 
@@ -117,6 +132,8 @@ pub enum Error {
     GitEvidence,
     #[error("derived graph contains duplicate identities or dangling relationships")]
     InvalidGraph,
+    #[error("persistent index snapshot is invalid or unsupported")]
+    Snapshot,
     #[error(transparent)]
     Core(#[from] middleman_core::Error),
     #[error(transparent)]

@@ -233,8 +233,17 @@ impl Store {
 
     /// Appends a bounded batch and its final projection atomically.
     pub fn append_batch(&self, batch: &[Event]) -> Result<(), Error> {
+        self.append_batch_with_snapshot(batch, None)
+    }
+
+    /// Appends events and replaces the source-free index snapshot in one transaction.
+    pub fn append_batch_with_snapshot(
+        &self,
+        batch: &[Event],
+        snapshot: Option<&[u8]>,
+    ) -> Result<(), Error> {
         if batch.is_empty() {
-            return Ok(());
+            return Err(Error::Corrupt("event batch must not be empty".into()));
         }
         if batch.len() > 256 {
             return Err(Error::Corrupt("event batch exceeds 256 entries".into()));
@@ -274,9 +283,26 @@ impl Store {
         }
         let events = read_events(&tx)?;
         rebuild_projection(&tx, &events)?;
+        if let Some(snapshot) = snapshot {
+            tx.execute(
+                "INSERT INTO index_snapshots(id, data) VALUES (1, ?1)
+                 ON CONFLICT(id) DO UPDATE SET data = excluded.data",
+                params![snapshot],
+            )?;
+        }
         tx.commit()?;
         drop(lock);
         Ok(())
+    }
+
+    /// Reads the current source-free incremental index snapshot.
+    pub fn index_snapshot(&self) -> Result<Option<Vec<u8>>, Error> {
+        self.conn
+            .query_row("SELECT data FROM index_snapshots WHERE id = 1", [], |row| {
+                row.get(0)
+            })
+            .optional()
+            .map_err(Error::from)
     }
 
     /// Restores a verified archive even when the existing event chain is corrupt.
@@ -303,6 +329,7 @@ impl Store {
         let lock = acquire_write_lock(&self.state_dir.join(WRITER_LOCK_FILE))?;
         let tx = self.conn.unchecked_transaction()?;
         tx.execute("DELETE FROM events", [])?;
+        tx.execute("DELETE FROM index_snapshots", [])?;
         for event in events {
             tx.execute(
                 "INSERT INTO events(sequence, id, project_id, kind, proposal_id, hash, raw)
@@ -459,10 +486,11 @@ struct Migration {
     script: &'static str,
 }
 
-const MIGRATIONS: &[Migration] = &[Migration {
-    version: 1,
-    name: "initial-schema",
-    script: "
+const MIGRATIONS: &[Migration] = &[
+    Migration {
+        version: 1,
+        name: "initial-schema",
+        script: "
 CREATE TABLE events (
     sequence INTEGER PRIMARY KEY,
     id TEXT NOT NULL UNIQUE,
@@ -492,7 +520,18 @@ CREATE TABLE retrieval (
 );
 CREATE TABLE project_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 ",
-}];
+    },
+    Migration {
+        version: 2,
+        name: "index-snapshots",
+        script: "
+CREATE TABLE index_snapshots (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    data BLOB NOT NULL
+);
+",
+    },
+];
 
 fn migrate(conn: &Connection) -> Result<(), Error> {
     conn.execute(

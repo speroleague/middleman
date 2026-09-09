@@ -4,6 +4,7 @@ use middleman_core::config::LimitsConfig;
 use middleman_core::{
     Edge, EdgeKind, Entity, EntityId, EntityKind, EntityPayload, Evidence, Hash, Status,
 };
+use serde::{Deserialize, Serialize};
 
 use super::{Budget, Error, path_key, resolve::Resolution};
 use crate::{
@@ -12,13 +13,13 @@ use crate::{
     scan::{FileKind, SourceFile},
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub(super) struct Package {
     pub name: String,
     pub library: PathBuf,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub(super) struct Facts {
     pub hash: Hash,
     pub kind: FileKind,
@@ -93,7 +94,7 @@ impl Facts {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub(super) struct Fragment {
     pub entities: Vec<Entity>,
     pub edges: Vec<Edge>,
