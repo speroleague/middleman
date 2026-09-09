@@ -42,6 +42,7 @@ rusqlite = { version = "0.40", features = ["bundled"] }
 
 # deterministic parsing
 regex = "1"
+ignore = "0.4"
 
 # development
 proptest = "1"

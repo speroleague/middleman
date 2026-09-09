@@ -12,6 +12,7 @@ workspace = true
 middleman-core = { workspace = true }
 blake3 = { workspace = true }
 regex = { workspace = true }
+ignore = { workspace = true }
 thiserror = { workspace = true }
 time = { workspace = true }
 tracing = { workspace = true }

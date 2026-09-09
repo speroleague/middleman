@@ -1,6 +1,6 @@
 //! Deterministic indexing edge for `Middleman`.
 //!
-//! Six stages, each a pure function of its input: filesystem scan,
+//! Six stages with filesystem/process effects confined to adapters: filesystem scan,
 //! document scan, language scan (regex-based in v1), Git scan, derived
 //! graph construction, and incremental refresh.
 //!
@@ -8,7 +8,10 @@
 //! - The only crate that reads repository files or invokes the Git CLI.
 //! - Never executes repository code.
 //! - All parsing is bounded by file size, line count, and time limits.
-//! - Output is core types only: no filesystem handles, git handles, or
-//!   raw parse state escapes this crate.
+//! - Stage results are owned values with no filesystem or process handles.
+//!   Source text is transient input to pure parsers, never durable memory.
+//!   The final graph uses core entities, edges, and evidence.
 
+pub mod document;
 pub mod git;
+pub mod scan;

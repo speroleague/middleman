@@ -40,8 +40,8 @@ apply, reject) with export/import/backup/restore.
 - [x] core: pure `project()` fold to state
 - [x] store: schema, migrations, WAL, file lock, busy retry
 - [x] cli: init, status, doctor
-- [ ] fixtures: deterministic test repositories
-- [ ] indexer: fs + document stage
+- [x] fixtures: deterministic test repositories
+- [x] indexer: fs + document stage
 - [ ] indexer: language + git stage
 - [ ] indexer: derived graph + incremental refresh
 - [ ] core: classification and scoring
@@ -68,8 +68,56 @@ apply, reject) with export/import/backup/restore.
 - `cargo test --workspace`
 - `cargo clippy --workspace --all-targets -- -D warnings`
 - `cargo fmt --check`
-- Phase exits 16.1/16.2 verified live against fixture repositories, not inferred.
+- Pending: verify phase exits 16.1/16.2 live against fixture repositories when the
+  corresponding CLI commands exist. They have not been verified yet.
 
 ## Next step / handoff
 
 - Continue at the first unchecked slice above. Read the spec (`context-broker-implementation-spec.md`) sections 6-11 for contracts; the crate-level doc comments state boundary rules.
+
+## Resumption: filesystem and document indexing
+
+- User authorized edits on 2026-09-09 after scope clarification.
+- Planned commits: `test: add deterministic repository fixtures` and
+  `feat(indexer): add bounded filesystem and document scanning`.
+- Complete the empty Rust fixture files, then implement scanner and pure document
+  extraction with focused integration tests. No CLI/persistence wiring in this slice.
+- Use the existing typed configuration without changing its serialized contract.
+  Add explicit total-byte and entry limits at the scanner boundary. Budget exhaustion
+  fails the run; excluded/binary/oversized files have typed skip outcomes.
+- Use the `ignore` crate for Git-compatible pattern matching. Load nested rules
+  with bounded reads, never traverse links, prune built-in sensitive/build paths
+  before reading, and give broker/config exclusions independent precedence.
+- Document parsing is a bounded Markdown subset (ATX headings, inline links,
+  simple frontmatter, code-span identifiers and routing tables). It does not
+  resolve external links or execute repository code.
+- Avoid coupling parsing to persistence: owned scan data flows to pure parsers;
+  later graph construction and event appends consume those results.
+- `CONVENTIONS.md` is absent in the repository and checked parent directories.
+  `jj status` could not snapshot because `.git/objects` is read-only; no commit
+  has been created during this resumption.
+- Implemented: `crates/indexer/src/scan.rs`, `document.rs`, and
+  `crates/indexer/tests/scanning.rs`; completed `tests/fixtures/rust-workspace`.
+  `ignore` 0.4.31 is locked in `Cargo.lock`.
+- Validation passed on Windows: workspace tests (34 tests, including 8 new
+  indexing integration tests and junction rejection), workspace Clippy with
+  warnings denied, and workspace format check. The Unix symlink test is
+  platform-gated and was not run here. Fixture code is data and was not executed.
+- Compatibility: no database migration or CLI behavior change. Markdown extraction
+  supports the documented subset, not full CommonMark/YAML. Timing checks are
+  cooperative around filesystem reads; this is not a sandbox against concurrent
+  malicious filesystem replacement. Default hard-denied names are a conservative
+  baseline, not a content-based secret detector.
+- Next: language + Git stage, then derived graph/incremental refresh. The current
+  Git probe still uses an unbounded subprocess; the next slice must replace it with
+  bounded process/output handling before invoking Git against repository data.
+
+```mermaid
+flowchart LR
+    Rules[Bounded ignore rules] --> Scan[Filesystem scan]
+    Scan --> Files[Sorted paths, hashes and bounded text]
+    Files --> Parse[Pure document extraction]
+    Parse --> Facts[Headings, links, identifiers and routing]
+    Facts -. later slice .-> Graph[Evidence-backed graph]
+    Graph -. later slice .-> Store[Transactional event append]
+```
