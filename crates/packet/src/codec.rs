@@ -135,7 +135,7 @@ fn markdown(packet: &Packet) -> Result<String, Error> {
     Ok(text)
 }
 
-fn escape(value: &str) -> String {
+pub(crate) fn escape(value: &str) -> String {
     let mut result = String::new();
     for ch in value.chars() {
         if ch.is_control() {

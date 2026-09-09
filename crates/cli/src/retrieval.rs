@@ -117,6 +117,22 @@ struct Loaded {
     hints: BTreeMap<EntityId, Hints>,
 }
 
+pub(super) fn guide_input(
+    repo: &Path,
+) -> Result<(String, BTreeMap<EntityId, middleman_core::Entity>), Error> {
+    let state_dir = repo.join(super::STATE_DIR);
+    if !state_dir.join(super::STATE_DB).is_file() {
+        return Err(Error::NotInitialized);
+    }
+    let store = Store::open_read_only(&state_dir)?;
+    let state = middleman_core::project(&store.events()?)?;
+    if state.project_id.is_none() {
+        return Err(Error::NotInitialized);
+    }
+    let loaded = load(repo, state)?;
+    Ok((loaded.state.project_name, loaded.graph.entities))
+}
+
 pub fn run(repo: &Path, command: &Commands) -> Result<(), Error> {
     validate(command)?;
     let state_dir = repo.join(super::STATE_DIR);

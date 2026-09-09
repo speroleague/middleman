@@ -12,6 +12,7 @@
 //! - Never invents content: renders core data only.
 
 mod codec;
+pub mod guides;
 mod model;
 mod selection;
 

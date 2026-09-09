@@ -47,7 +47,7 @@ apply, reject) with export/import/backup/restore.
 - [x] core: classification and scoring
 - [x] packet: Context IR + renderers + budgets
 - [x] cli: prepare, expand, search, explain (fixture routing verified)
-- [ ] cli: render agents-md, agent-context
+- [x] cli: render agents-md, agent-context
 - [ ] cli: task start/finish with automatic observations
 - [ ] core: proposal validation
 - [ ] cli: propose from-git / structured input
@@ -84,7 +84,9 @@ apply, reject) with export/import/backup/restore.
   for CIR grammar, budget semantics and validation.
 - Retrieval CLI is complete; see [the command handoff](005-retrieval-cli.md)
   for command contracts, prompt-free packet events, validation and current fresh-scan
-  behavior. Next: generated agent guides. Standalone index/persistent snapshot work
+  behavior. Generated agent guides are complete; see [the guide handoff](006-agent-guides.md)
+  for preview/write semantics, preservation and validation. Next: task start/finish
+  and automatic observations. Standalone index/persistent snapshot work
   is explicitly tracked above before final phase-exit validation.
 
 ## Language and Git slice
