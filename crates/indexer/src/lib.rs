@@ -17,4 +17,5 @@ pub mod git;
 pub mod graph;
 pub mod language;
 pub mod process;
+pub mod routing;
 pub mod scan;

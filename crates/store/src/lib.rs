@@ -94,19 +94,37 @@ pub struct Store {
 }
 
 impl Store {
+    /// Opens an existing store without migration or projection writes.
+    /// Consumers needing a consistent snapshot should project `events()`.
+    pub fn open_read_only(state_dir: &Path) -> Result<Self, Error> {
+        let conn = Connection::open_with_flags(
+            state_dir.join(DB_FILE),
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+        )?;
+        conn.pragma_update(None, "busy_timeout", BUSY_TIMEOUT_MS)?;
+        project_or_corrupt(&read_events(&conn)?)?;
+        Ok(Self {
+            conn,
+            state_dir: state_dir.to_path_buf(),
+        })
+    }
     /// Opens (creating as needed) broker state. Verifies the event log
     /// hash chain and rebuilds projections, so opening after a crash
     /// always yields a consistent store: recovery is replay-from-log.
     pub fn open(state_dir: &Path) -> Result<Self, Error> {
         std::fs::create_dir_all(state_dir)?;
+        let lock = acquire_write_lock(&state_dir.join(WRITER_LOCK_FILE))?;
         let conn = Connection::open(state_dir.join(DB_FILE))?;
         conn.pragma_update(None, "journal_mode", "WAL")?;
         conn.pragma_update(None, "busy_timeout", BUSY_TIMEOUT_MS)?;
         migrate(&conn)?;
 
-        let events = read_events(&conn)?;
+        let tx = conn.unchecked_transaction()?;
+        let events = read_events(&tx)?;
         let state = project_or_corrupt(&events)?;
-        write_state(&conn, &state)?;
+        write_state(&tx, &state)?;
+        tx.commit()?;
+        drop(lock);
 
         Ok(Self {
             conn,

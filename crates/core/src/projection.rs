@@ -92,6 +92,22 @@ pub fn project(events: &[Event]) -> Result<State, Error> {
 
     for event in events {
         match &event.kind {
+            EventKind::PacketPrepared {
+                selected, expanded, ..
+            } => {
+                for node_id in selected {
+                    state.retrieval.push(RetrievalRecord {
+                        task_id: None,
+                        node_id: node_id.clone(),
+                        signal: if *expanded {
+                            RetrievalSignal::Expanded
+                        } else {
+                            RetrievalSignal::Retrieved
+                        },
+                        at: event.occurred_at,
+                    });
+                }
+            }
             EventKind::ProjectInitialized { project_name } => {
                 state.project_id = Some(event.project_id.clone());
                 state.project_name.clone_from(project_name);

@@ -65,6 +65,16 @@ pub struct Event {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum EventKind {
+    PacketPrepared {
+        candidates: Vec<crate::routing::Candidate>,
+        selected: Vec<EntityId>,
+        format: crate::config::OutputFormat,
+        budget: usize,
+        estimated_tokens: usize,
+        ranking_truncated: bool,
+        low_confidence: bool,
+        expanded: bool,
+    },
     ProjectInitialized {
         project_name: String,
     },

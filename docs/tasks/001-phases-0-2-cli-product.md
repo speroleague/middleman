@@ -46,13 +46,14 @@ apply, reject) with export/import/backup/restore.
 - [x] indexer: derived graph + incremental refresh
 - [x] core: classification and scoring
 - [x] packet: Context IR + renderers + budgets
-- [ ] cli: prepare, expand, search, explain (spec 16.1 exit)
+- [x] cli: prepare, expand, search, explain (fixture routing verified)
 - [ ] cli: render agents-md, agent-context
 - [ ] cli: task start/finish with automatic observations
 - [ ] core: proposal validation
 - [ ] cli: propose from-git / structured input
 - [ ] cli: review, apply, reject
 - [ ] cli: export, import, backup, restore
+- [ ] cli/store: standalone index command and persistent incremental snapshots
 - [ ] docs: agent guide answers + phase 3-5 handoff (spec 16.2 exit)
 
 ## Changes made
@@ -80,8 +81,11 @@ apply, reject) with export/import/backup/restore.
 - Core classification/scoring is complete; see [the routing handoff](003-classification-scoring.md)
   for signals, ranking, confidence, validation and adapter responsibilities.
   Packet rendering is complete; see [the packet handoff](004-context-packets.md)
-  for CIR grammar, budget semantics and validation. Next: CLI prepare, expand,
-  search and explain.
+  for CIR grammar, budget semantics and validation.
+- Retrieval CLI is complete; see [the command handoff](005-retrieval-cli.md)
+  for command contracts, prompt-free packet events, validation and current fresh-scan
+  behavior. Next: generated agent guides. Standalone index/persistent snapshot work
+  is explicitly tracked above before final phase-exit validation.
 
 ## Language and Git slice
 

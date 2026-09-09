@@ -15,6 +15,8 @@ use thiserror::Error;
 use middleman_core::entity::TaskStatus;
 use middleman_core::{Config, Event, EventId, Hash, ProjectId, ProposalId, TaskId, TaskRecord};
 
+mod retrieval;
+
 const STATE_DIR: &str = ".middleman";
 const CONFIG_FILE: &str = "middleman.toml";
 const STATE_DB: &str = "context.sqlite3";
@@ -36,6 +38,8 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Commands {
+    #[command(flatten)]
+    Retrieval(retrieval::Commands),
     /// Initialize `.middleman/` in a repository.
     Init {
         /// Project name (defaults to the repository directory's name).
@@ -50,6 +54,8 @@ enum Commands {
 
 #[derive(Debug, Error)]
 enum Failure {
+    #[error("retrieval: {0}")]
+    Retrieval(#[from] retrieval::Error),
     #[error("`{0}` is not a directory")]
     NotADirectory(PathBuf),
     #[error("`.middleman` already exists in `{0}`: run `middleman doctor` to inspect it")]
@@ -76,6 +82,7 @@ fn run(cli: &Cli) -> Result<(), Failure> {
         return Err(Failure::NotADirectory(cli.repo.clone()));
     }
     match &cli.command {
+        Commands::Retrieval(command) => retrieval::run(repo, command).map_err(Failure::from),
         Commands::Init { name } => init(repo, name.as_deref()),
         Commands::Status => status(repo),
         Commands::Doctor => doctor(repo),
@@ -261,6 +268,9 @@ fn doctor_checks(repo: &Path) -> Vec<(&'static str, bool, String)> {
 }
 
 fn read_toml_config(path: &Path) -> Result<Config, String> {
+    if std::fs::metadata(path).map_err(|e| e.to_string())?.len() > 65_536 {
+        return Err("configuration exceeds 64 KiB".into());
+    }
     let raw = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
     Config::parse(&raw).map_err(|e| e.to_string())
 }
@@ -274,10 +284,39 @@ fn require_state_dir(repo: &Path) -> Result<PathBuf, Failure> {
 }
 
 pub fn main() -> ExitCode {
-    let cli = Cli::parse();
+    let cli = match Cli::try_parse() {
+        Ok(cli) => cli,
+        Err(error)
+            if matches!(
+                error.kind(),
+                clap::error::ErrorKind::DisplayHelp | clap::error::ErrorKind::DisplayVersion
+            ) =>
+        {
+            let _ = error.print();
+            return ExitCode::SUCCESS;
+        }
+        Err(_) => {
+            eprintln!(
+                "{}",
+                serde_json::json!({"error": {"code": "invalid_arguments", "message": "invalid command arguments; use --help"}})
+            );
+            return ExitCode::from(2);
+        }
+    };
     match run(&cli) {
         Ok(()) => ExitCode::SUCCESS,
         Err(failure) => {
+            if let Commands::Retrieval(_) = cli.command {
+                let code = match &failure {
+                    Failure::Retrieval(error) => error.code(),
+                    _ => "invalid_repository",
+                };
+                eprintln!(
+                    "{}",
+                    serde_json::json!({"error": {"code": code, "message": failure.to_string()}})
+                );
+                return ExitCode::FAILURE;
+            }
             eprintln!("{failure}");
             ExitCode::FAILURE
         }

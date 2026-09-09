@@ -13,6 +13,32 @@ use time::OffsetDateTime;
 use middleman_store::Error;
 use middleman_store::Store;
 
+#[test]
+fn read_only_open_does_not_rebuild_or_create_state() {
+    let dir = tempfile::tempdir().unwrap();
+    assert!(Store::open_read_only(dir.path()).is_err());
+    assert!(!dir.path().join("context.sqlite3").exists());
+    let store = Store::open(dir.path()).unwrap();
+    store.append(&init_event()).unwrap();
+    drop(store);
+    let conn = rusqlite::Connection::open(dir.path().join("context.sqlite3")).unwrap();
+    conn.execute(
+        "INSERT INTO project_meta(key, value) VALUES ('read_only_probe', '1')",
+        [],
+    )
+    .unwrap();
+    let reader = Store::open_read_only(dir.path()).unwrap();
+    assert_eq!(reader.events().unwrap().len(), 1);
+    let probe: String = conn
+        .query_row(
+            "SELECT value FROM project_meta WHERE key = 'read_only_probe'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(probe, "1");
+}
+
 fn ulid_bytes(sequence: u64) -> [u8; 16] {
     let mut bytes = [0u8; 16];
     let ts = 1_700_000_000_000u64 + sequence;

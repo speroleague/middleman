@@ -64,6 +64,47 @@ fn weights_match_specification() {
 }
 
 #[test]
+fn explicit_expansion_keeps_target_first_and_excludes_ineligible_nodes() {
+    let root = module("z.rs");
+    let neighbor = module("a.rs");
+    let entities = [root.clone(), neighbor.clone()]
+        .into_iter()
+        .map(|entity| (entity.id.clone(), entity))
+        .collect();
+    let edges = [edge(&root, &neighbor, EdgeKind::Imports)];
+    let mut hints = BTreeMap::new();
+    let result = middleman_core::routing::expand(
+        &root.id,
+        &Context {
+            entities: &entities,
+            edges: &edges,
+            hints: &hints,
+            cochanges: &[],
+        },
+    );
+    assert_eq!(result.candidates[0].id, root.id);
+    assert_eq!(result.candidates[0].score, 70);
+    assert_eq!(result.candidates[1].score, 50);
+    hints.insert(
+        root.id.clone(),
+        Hints {
+            ignored: true,
+            ..Hints::default()
+        },
+    );
+    let result = middleman_core::routing::expand(
+        &root.id,
+        &Context {
+            entities: &entities,
+            edges: &edges,
+            hints: &hints,
+            cochanges: &[],
+        },
+    );
+    assert!(result.candidates.is_empty() && result.low_confidence);
+}
+
+#[test]
 fn paths_are_exact_case_sensitive_and_portable() {
     let entity = module("src/lib.rs");
     let entities = BTreeMap::from([(entity.id.clone(), entity)]);

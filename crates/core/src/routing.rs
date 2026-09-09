@@ -313,3 +313,74 @@ fn contains(text: &str, phrase: &str) -> bool {
 fn identifier_char(value: char) -> bool {
     value.is_alphanumeric() || matches!(value, '_' | '/' | '\\' | '-' | '.')
 }
+
+/// Rank an explicit ID and its direct dependency/test neighbors (at most 128).
+pub fn expand(id: &EntityId, context: &Context<'_>) -> Ranking {
+    let eligible = |id: &EntityId| {
+        context
+            .entities
+            .get(id)
+            .is_some_and(|entity| entity.status == Status::Active)
+            && context
+                .hints
+                .get(id)
+                .is_none_or(|hints| !hints.ignored && hints.stale_penalty == 0)
+    };
+    if !eligible(id) {
+        return Ranking {
+            candidates: vec![],
+            classification: classify("", None),
+            excluded: BTreeMap::new(),
+            confidence: 0,
+            low_confidence: true,
+            truncated: false,
+        };
+    }
+    let mut signals = BTreeMap::from([(id.clone(), Signal::ExplicitRouting)]);
+    for edge in context.edges {
+        let target = if edge.from == *id {
+            &edge.to
+        } else if edge.to == *id {
+            &edge.from
+        } else {
+            continue;
+        };
+        if target == id {
+            continue;
+        }
+        let signal = match edge.kind {
+            EdgeKind::Imports | EdgeKind::DependsOn | EdgeKind::Calls => Signal::DirectDependency,
+            EdgeKind::Tests | EdgeKind::Validates => Signal::DirectTest,
+            _ => continue,
+        };
+        signals
+            .entry(target.clone())
+            .and_modify(|current| {
+                if signal.weight() > current.weight() {
+                    *current = signal;
+                }
+            })
+            .or_insert(signal);
+    }
+    let mut candidates: Vec<_> = signals
+        .into_iter()
+        .filter(|(id, _)| eligible(id))
+        .map(|(id, signal)| Candidate {
+            id,
+            score: signal.weight(),
+            signals: BTreeSet::from([signal]),
+            stale_penalty: 0,
+        })
+        .collect();
+    candidates.sort_by(|a, b| b.score.cmp(&a.score).then_with(|| a.id.cmp(&b.id)));
+    let truncated = candidates.len() > 128;
+    candidates.truncate(128);
+    Ranking {
+        candidates,
+        classification: classify("", None),
+        excluded: BTreeMap::new(),
+        confidence: 70,
+        low_confidence: false,
+        truncated,
+    }
+}
