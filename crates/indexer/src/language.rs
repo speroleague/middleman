@@ -58,6 +58,7 @@ pub struct Import {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LanguageIndex {
     pub language: Language,
+    pub module_name: Option<String>,
     pub declarations: Vec<Declaration>,
     pub imports: Vec<Import>,
     pub exports: Vec<String>,
@@ -87,6 +88,7 @@ pub fn parse(
     let masked = mask(text, language);
     let mut result = LanguageIndex {
         language,
+        module_name: None,
         declarations: Vec::new(),
         imports: Vec::new(),
         exports: Vec::new(),
@@ -99,6 +101,9 @@ pub fn parse(
         let line = masked_line.trim();
         if line.is_empty() {
             continue;
+        }
+        if let Some(name) = module_name(language, line) {
+            result.module_name = Some(name);
         }
         if language == Language::Rust && (line == "#[test]" || line.ends_with("::test]")) {
             test_attribute = true;
@@ -170,6 +175,20 @@ pub fn parse(
     }
     result.exports = exports.into_iter().collect();
     Ok(result)
+}
+
+fn module_name(language: Language, line: &str) -> Option<String> {
+    match language {
+        Language::Php => line
+            .strip_prefix("namespace ")
+            .and_then(|s| s.strip_suffix(';'))
+            .map(|s| s.trim().to_owned()),
+        Language::Elm => line
+            .strip_prefix("module ")
+            .and_then(|s| s.split_whitespace().next())
+            .map(str::to_owned),
+        _ => None,
+    }
 }
 
 fn declaration<'a>(

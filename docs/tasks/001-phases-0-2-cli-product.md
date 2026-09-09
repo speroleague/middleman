@@ -43,7 +43,7 @@ apply, reject) with export/import/backup/restore.
 - [x] fixtures: deterministic test repositories
 - [x] indexer: fs + document stage
 - [x] indexer: language + git stage
-- [ ] indexer: derived graph + incremental refresh
+- [x] indexer: derived graph + incremental refresh
 - [ ] core: classification and scoring
 - [ ] packet: Context IR + renderers + budgets
 - [ ] cli: prepare, expand, search, explain (spec 16.1 exit)
@@ -75,6 +75,9 @@ apply, reject) with export/import/backup/restore.
 ## Next step / handoff
 
 - Continue at the first unchecked slice above. Read the spec (`context-broker-implementation-spec.md`) sections 6-11 for contracts; the crate-level doc comments state boundary rules.
+- Derived graph/refresh is complete; see [the focused handoff](002-derived-graph-refresh.md)
+  for the API, cache/evidence contracts, validation and known limits. Next: core
+  classification and scoring.
 
 ## Language and Git slice
 

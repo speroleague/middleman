@@ -545,10 +545,12 @@ dependencies = [
  "blake3",
  "ignore",
  "middleman-core",
+ "proptest",
  "regex",
  "tempfile",
  "thiserror",
  "time",
+ "toml",
  "tracing",
 ]
 

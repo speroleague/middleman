@@ -2,7 +2,8 @@
 //!
 //! Identifiers are prefixed ULIDs (`evt_`, `ent_`, `task_`, `prop_`,
 //! `proj_`), matching the spec's `task_01H...` examples. Construction
-//! validates the format, so an invalid identifier cannot exist.
+//! validates the format, so an invalid identifier cannot exist. Indexed entities
+//! also support stable namespaced keys with percent-encoded UTF-8 components.
 
 use std::fmt;
 use std::str::FromStr;
@@ -89,6 +90,9 @@ fn validate_ulid_id(prefix: &str, raw: &str) -> Result<String, Error> {
 /// Display/debug/serde protocol shared by every identifier type.
 macro_rules! impl_id_protocol {
     ($name:ident, $prefix:literal) => {
+        impl_id_protocol!($name, $prefix, validate_ulid_id);
+    };
+    ($name:ident, $prefix:literal, $validate:ident) => {
         impl fmt::Display for $name {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 f.write_str(&self.0)
@@ -110,7 +114,7 @@ macro_rules! impl_id_protocol {
         impl<'de> Deserialize<'de> for $name {
             fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
                 let raw = String::deserialize(deserializer)?;
-                let validated = validate_ulid_id($prefix, &raw).map_err(D::Error::custom)?;
+                let validated = $validate($prefix, &raw).map_err(D::Error::custom)?;
                 Ok(Self(validated))
             }
         }
@@ -139,7 +143,29 @@ pub struct EntityId(String);
 
 impl EntityId {
     pub fn new(raw: impl AsRef<str>) -> Result<Self, Error> {
-        validate_ulid_id("ent_", raw.as_ref()).map(Self)
+        validate_entity_id("ent_", raw.as_ref()).map(Self)
+    }
+
+    /// Component separators cannot collide with encoded source names.
+    pub fn derived(namespace: &str, components: &[&str]) -> Result<Self, Error> {
+        let encoded: Vec<_> = components
+            .iter()
+            .map(|component| {
+                const HEX: &[u8] = b"0123456789ABCDEF";
+                let mut value = String::new();
+                for byte in component.bytes() {
+                    if byte.is_ascii_alphanumeric() || b"/-_.".contains(&byte) {
+                        value.push(char::from(byte));
+                    } else {
+                        value.push('%');
+                        value.push(char::from(HEX[usize::from(byte >> 4)]));
+                        value.push(char::from(HEX[usize::from(byte & 15)]));
+                    }
+                }
+                value
+            })
+            .collect();
+        Self::new(format!("{namespace}:{}", encoded.join("#")))
     }
 
     pub fn as_str(&self) -> &str {
@@ -147,7 +173,40 @@ impl EntityId {
     }
 }
 
-impl_id_protocol!(EntityId, "ent_");
+impl_id_protocol!(EntityId, "ent_", validate_entity_id);
+
+fn validate_entity_id(prefix: &str, raw: &str) -> Result<String, Error> {
+    if raw.starts_with(prefix) {
+        return validate_ulid_id(prefix, raw);
+    }
+    let Some((namespace, key)) = raw.split_once(':') else {
+        return Err(Error::InvalidId(raw.into()));
+    };
+    if !matches!(
+        namespace,
+        "mod" | "sym" | "test" | "doc" | "dec" | "inv" | "con" | "task" | "risk" | "q" | "op"
+    ) || raw.len() > 4096
+        || key.split('#').any(str::is_empty)
+    {
+        return Err(Error::InvalidId(raw.into()));
+    }
+    let mut bytes = key.bytes();
+    while let Some(byte) = bytes.next() {
+        if byte == b'%' {
+            for _ in 0..2 {
+                if !bytes
+                    .next()
+                    .is_some_and(|b| b.is_ascii_digit() || (b'A'..=b'F').contains(&b))
+                {
+                    return Err(Error::InvalidId(raw.into()));
+                }
+            }
+        } else if !byte.is_ascii_alphanumeric() && !b"/-_.#".contains(&byte) {
+            return Err(Error::InvalidId(raw.into()));
+        }
+    }
+    Ok(raw.into())
+}
 
 /// Identifier of one recorded task.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]

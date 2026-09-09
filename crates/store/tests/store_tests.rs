@@ -70,6 +70,59 @@ fn open_store(dir: &Path) -> Store {
     Store::open(dir).expect("store opens")
 }
 
+#[test]
+fn derived_entity_ids_survive_event_replay_and_sqlite_reopen() {
+    use middleman_core::{Entity, EntityId, EntityKind, EntityPayload, Evidence, Status};
+
+    let dir = tempfile::tempdir().unwrap();
+    let initial = init_event();
+    let entity = Entity::new(
+        EntityId::derived("doc", &["docs/guide.md"]).unwrap(),
+        EntityKind::Document,
+        Status::Active,
+        "Guide".into(),
+        EntityPayload::Document {
+            path: "docs/guide.md".into(),
+            title: "Guide".into(),
+            kind: "document".into(),
+            authority: "observed".into(),
+        },
+        vec![Evidence::Document {
+            path: "docs/guide.md".into(),
+            content_hash: Hash::of(b"# Guide").to_hex(),
+        }],
+    )
+    .unwrap();
+    let declared = Event::new(
+        EventId::new(id("evt_", 2)).unwrap(),
+        project_id(),
+        2,
+        OffsetDateTime::UNIX_EPOCH,
+        Actor::System,
+        EventKind::EntityDeclared {
+            entity: entity.clone(),
+        },
+        Vec::new(),
+        None,
+        initial.hash,
+    )
+    .unwrap();
+    let events = vec![initial, declared];
+    {
+        let store = open_store(dir.path());
+        for event in &events {
+            store.append(event).unwrap();
+        }
+    }
+    let store = open_store(dir.path());
+    assert_eq!(store.events().unwrap(), events);
+    assert_eq!(
+        store.state().unwrap(),
+        middleman_core::project(&events).unwrap()
+    );
+    assert_eq!(store.state().unwrap().entities[&entity.id], entity);
+}
+
 /// Spawns the sibling `store_cli` test binary, which holds the file
 /// lock at `lock` for `ms` milliseconds in its own process.
 fn spawn_lock_holder(lock: &Path, ms: u64) -> std::process::Child {
