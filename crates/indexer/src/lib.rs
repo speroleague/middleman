@@ -1,7 +1,7 @@
 //! Deterministic indexing edge for `Middleman`.
 //!
 //! Six stages with filesystem/process effects confined to adapters: filesystem scan,
-//! document scan, language scan (regex-based in v1), Git scan, derived
+//! document scan, language scan (lightweight lexical hints in v1), Git scan, derived
 //! graph construction, and incremental refresh.
 //!
 //! Boundary rules:
@@ -14,4 +14,6 @@
 
 pub mod document;
 pub mod git;
+pub mod language;
+pub mod process;
 pub mod scan;

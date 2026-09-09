@@ -42,7 +42,7 @@ apply, reject) with export/import/backup/restore.
 - [x] cli: init, status, doctor
 - [x] fixtures: deterministic test repositories
 - [x] indexer: fs + document stage
-- [ ] indexer: language + git stage
+- [x] indexer: language + git stage
 - [ ] indexer: derived graph + incremental refresh
 - [ ] core: classification and scoring
 - [ ] packet: Context IR + renderers + budgets
@@ -61,7 +61,8 @@ apply, reject) with export/import/backup/restore.
 - `crates/core` — error types, ULID-based identifiers, blake3 `Hash`, entities/edges/evidence, hash-chained events, pure `project()` fold, TOML `Config`; unit + proptest coverage.
 - `crates/store` — SQLite schema + migrations, WAL + busy timeout, single-writer file lock, transactional append with projection rebuild; integration tests incl. crash recovery, corruption refusal, lock retry/timeout, busy retry.
 - `crates/cli` — `init`, `status`, `doctor` (clap 4).
-- `crates/indexer` — git CLI probe (bounded).
+- `crates/indexer` — bounded filesystem/document/language stages and restricted
+  Git observations; `doctor` uses the bounded Git probe.
 
 ## Validation
 
@@ -74,6 +75,51 @@ apply, reject) with export/import/backup/restore.
 ## Next step / handoff
 
 - Continue at the first unchecked slice above. Read the spec (`context-broker-implementation-spec.md`) sections 6-11 for contracts; the crate-level doc comments state boundary rules.
+
+## Language and Git slice
+
+- Planned commit: `feat(indexer): extract language and git observations`.
+- Pure language stage: bounded lightweight extraction for Rust, PHP, Elm,
+  TypeScript/JavaScript, Python, and Go. Return declarations, imports, visibility,
+  signatures and test hints with line references. Unsupported syntax produces no
+  invented semantic relationships; this is not a compiler or name resolver.
+- Git edge: finite time, output, history and file-count budgets; sanitize errors;
+  disable configured clean/process filters, fsmonitor, pagers, external diffs,
+  signatures and lazy fetch. No hooks or source code execution, author identities,
+  messages, network, or durable writes. Keep parsers separate from process control.
+- Caller supplies allowed repository-relative paths from current/previous scans;
+  discard other paths. A caller wanting deletion observations must include previous
+  accepted paths. History is bounded and exposes truncation, never claims complete
+  ownership or complete co-change history. Graph derivation remains the next slice.
+- Test process timeout/output overflow with a compiled helper; construct temporary
+  Git histories with fixed synthetic identities. Test hostile filter configuration
+  by verifying that its marker file is not created.
+- Implemented in `crates/indexer/src/language.rs`, `git.rs`, and `process.rs`, with
+  focused tests in `tests/language_observations.rs` and `tests/git_observations.rs`
+  inside that crate. The process helper runs only through the test executable;
+  no helper binary is shipped with the product.
+- Validation: `cargo test --workspace --offline` (45 tests),
+  `cargo clippy --workspace --all-targets --offline -- -D warnings`, and
+  `cargo fmt --all --check` passed on Windows. Git tests cover unchanged index
+  bytes, first-parent touch history, deletion/untracked paths, no filter/fsmonitor
+  execution, malformed NUL records, truncation, time and output limits.
+- Limits: language hints do not cover every syntax form (for example PHP heredocs,
+  multiline declarations, macro expansions, or all import/export forms). Git paths
+  require UTF-8 without backslashes; unsupported paths fail explicitly. Filters
+  are disabled so changes may differ from a user's filtered status. No author
+  identity is retained; last-touch commits provide ownership evidence only.
+- Compatibility: no database/config migration. `doctor` gains bounded Git process
+  handling and sanitized errors. CLI indexing and graph persistence remain pending.
+- Next: derived graph and incremental refresh, using these pure observations.
+
+```mermaid
+flowchart LR
+    Source[Bounded source text] --> Parse[Pure language extraction]
+    Allowed[Allowed relative paths] --> Git[Bounded and restricted Git adapter]
+    Git --> Observations[Changes and commit touch groups]
+    Parse --> Graph[Later graph stage]
+    Observations --> Graph
+```
 
 ## Resumption: filesystem and document indexing
 
@@ -109,9 +155,8 @@ apply, reject) with export/import/backup/restore.
   cooperative around filesystem reads; this is not a sandbox against concurrent
   malicious filesystem replacement. Default hard-denied names are a conservative
   baseline, not a content-based secret detector.
-- Next: language + Git stage, then derived graph/incremental refresh. The current
-  Git probe still uses an unbounded subprocess; the next slice must replace it with
-  bounded process/output handling before invoking Git against repository data.
+- Language/Git indexing is now completed above. Continue with derived graph and
+  incremental refresh; the Git probe now uses the bounded process adapter.
 
 ```mermaid
 flowchart LR
