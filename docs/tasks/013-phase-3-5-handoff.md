@@ -38,9 +38,16 @@ suggestions. Optional model use must remain off by default and produce proposals
 never silent durable-memory writes. Core retrieval must remain useful with every
 optional feature disabled.
 
-## Deferred work and open validation
+## Phase 2 exit validation
+
+`crates/cli/tests/phase_two.rs` exercises two independent command-process
+sessions. The first indexes a repository, starts and finishes a task, submits and
+applies a reviewed decision, and exports the event log. The second imports only
+that reviewed state into a matching checkout, indexes it, receives the decision
+in a fresh packet for related work, then completes its task. No chat transcript,
+prompt body or source body is transferred.
+
+## Deferred work
 
 Do not add cloud sync, embeddings, generic shell/filesystem MCP tools, request
-proxying, or orchestration. Before beginning Phase 3, add the Phase 2 exit test:
-two separate CLI/harness-process sessions complete related work with only a
-packet and reviewed exported/imported state, without sharing a transcript.
+proxying, or orchestration. Phase 3 can begin from this checked CLI contract.

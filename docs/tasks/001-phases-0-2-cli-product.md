@@ -94,10 +94,10 @@ apply, reject) with export/import/backup/restore.
   see [the lifecycle handoff](010-proposal-review-lifecycle.md) for typed acceptance,
   rejection and terminal-state rules. State transfer is complete; see
   [the transfer handoff](011-state-transfer.md). Indexing is complete; see
-  [the persistent-index handoff](012-persistent-index.md). Next: finish the
-  Phase 2 exit test: two separate sessions must complete related work using only
-  the broker packet and reviewed state. Phase 3-5 implementation begins only
-  after that validation; see [the harness handoff](013-phase-3-5-handoff.md).
+  [the persistent-index handoff](012-persistent-index.md). The Phase 2 exit is
+  validated by independent session handoff using only a packet and reviewed
+  exported/imported state; see [the harness handoff](013-phase-3-5-handoff.md).
+  Phase 3 can begin with the MCP facade over this CLI contract.
 
 ## Language and Git slice
 
