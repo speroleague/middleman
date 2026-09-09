@@ -93,9 +93,10 @@ apply, reject) with export/import/backup/restore.
   resolve external links or execute repository code.
 - Avoid coupling parsing to persistence: owned scan data flows to pure parsers;
   later graph construction and event appends consume those results.
-- `CONVENTIONS.md` is absent in the repository and checked parent directories.
-  `jj status` could not snapshot because `.git/objects` is read-only; no commit
-  has been created during this resumption.
+- VCS access resolved: `.git` is not marked read-only on Windows; the execution
+  sandbox denied writes. Approved Jujutsu commands successfully snapshot and
+  commit without changing ACLs. Follow the new root `CONVENTIONS.md`.
+- Completed commits: `4de3bdd5` (fixtures), `0aea6044` (filesystem/document scan).
 - Implemented: `crates/indexer/src/scan.rs`, `document.rs`, and
   `crates/indexer/tests/scanning.rs`; completed `tests/fixtures/rust-workspace`.
   `ignore` 0.4.31 is locked in `Cargo.lock`.
