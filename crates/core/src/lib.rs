@@ -14,12 +14,14 @@
 //! - Pure functions in, owned types out; untrusted input is rejected at
 //!   this boundary with typed errors, never a panic.
 
+pub mod config;
 pub mod entity;
 pub mod error;
 pub mod event;
 pub mod ids;
 pub mod projection;
 
+pub use config::Config;
 pub use entity::{Edge, EdgeKind, Entity, EntityKind, EntityPayload, Evidence, Status};
 pub use error::Error;
 pub use event::{Actor, Claim, Event, EventKind, RetrievalSignal};

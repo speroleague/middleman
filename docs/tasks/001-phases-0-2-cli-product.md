@@ -36,10 +36,10 @@ apply, reject) with export/import/backup/restore.
 
 - [x] base docs commit
 - [x] workspace scaffold (7 crates, lint config, committed lockfile)
-- [ ] core: event model with blake3 hash chain and typed payloads
-- [ ] core: pure `project()` fold to state
-- [ ] store: schema, migrations, WAL, file lock, busy retry
-- [ ] cli: init, status, doctor
+- [x] core: event model with blake3 hash chain and typed payloads
+- [x] core: pure `project()` fold to state
+- [x] store: schema, migrations, WAL, file lock, busy retry
+- [x] cli: init, status, doctor
 - [ ] fixtures: deterministic test repositories
 - [ ] indexer: fs + document stage
 - [ ] indexer: language + git stage
@@ -58,6 +58,10 @@ apply, reject) with export/import/backup/restore.
 ## Changes made
 
 - `Cargo.toml`, `crates/*/`, `.gitignore`, `Cargo.lock` — workspace scaffold.
+- `crates/core` — error types, ULID-based identifiers, blake3 `Hash`, entities/edges/evidence, hash-chained events, pure `project()` fold, TOML `Config`; unit + proptest coverage.
+- `crates/store` — SQLite schema + migrations, WAL + busy timeout, single-writer file lock, transactional append with projection rebuild; integration tests incl. crash recovery, corruption refusal, lock retry/timeout, busy retry.
+- `crates/cli` — `init`, `status`, `doctor` (clap 4).
+- `crates/indexer` — git CLI probe (bounded).
 
 ## Validation
 

@@ -10,3 +10,5 @@
 //! - All parsing is bounded by file size, line count, and time limits.
 //! - Output is core types only: no filesystem handles, git handles, or
 //!   raw parse state escapes this crate.
+
+pub mod git;
