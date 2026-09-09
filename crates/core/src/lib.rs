@@ -20,6 +20,7 @@ pub mod error;
 pub mod event;
 pub mod ids;
 pub mod projection;
+pub mod routing;
 
 pub use config::Config;
 pub use entity::{Edge, EdgeKind, Entity, EntityKind, EntityPayload, Evidence, Status};

@@ -44,7 +44,7 @@ apply, reject) with export/import/backup/restore.
 - [x] indexer: fs + document stage
 - [x] indexer: language + git stage
 - [x] indexer: derived graph + incremental refresh
-- [ ] core: classification and scoring
+- [x] core: classification and scoring
 - [ ] packet: Context IR + renderers + budgets
 - [ ] cli: prepare, expand, search, explain (spec 16.1 exit)
 - [ ] cli: render agents-md, agent-context
@@ -76,8 +76,10 @@ apply, reject) with export/import/backup/restore.
 
 - Continue at the first unchecked slice above. Read the spec (`context-broker-implementation-spec.md`) sections 6-11 for contracts; the crate-level doc comments state boundary rules.
 - Derived graph/refresh is complete; see [the focused handoff](002-derived-graph-refresh.md)
-  for the API, cache/evidence contracts, validation and known limits. Next: core
-  classification and scoring.
+  for the API, cache/evidence contracts, validation and known limits.
+- Core classification/scoring is complete; see [the routing handoff](003-classification-scoring.md)
+  for signals, ranking, confidence, validation and adapter responsibilities.
+  Next: Context IR, renderers and budgets.
 
 ## Language and Git slice
 
