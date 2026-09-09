@@ -228,36 +228,50 @@ impl Store {
     /// Appends one event and updates the projection in a single
     /// transaction, under the repository's single-writer lock.
     pub fn append(&self, event: &Event) -> Result<(), Error> {
-        let (last_sequence, last_hash) = self.tail()?;
-        let expected_sequence = last_sequence + 1;
-        if event.sequence != expected_sequence {
-            return Err(Error::StaleSequence {
-                expected: expected_sequence,
-                found: event.sequence,
-            });
-        }
-        if event.previous_hash != last_hash.unwrap_or(Hash::genesis()) {
-            return Err(Error::StaleHash);
-        }
+        self.append_batch(std::slice::from_ref(event))
+    }
 
+    /// Appends a bounded batch and its final projection atomically.
+    pub fn append_batch(&self, batch: &[Event]) -> Result<(), Error> {
+        if batch.is_empty() {
+            return Ok(());
+        }
+        if batch.len() > 256 {
+            return Err(Error::Corrupt("event batch exceeds 256 entries".into()));
+        }
         let lock = acquire_write_lock(&self.state_dir.join(WRITER_LOCK_FILE))?;
-        let raw = serde_json::to_string(event)?;
+        let (mut sequence, hash) = self.tail()?;
+        let mut previous = hash.unwrap_or(Hash::genesis());
         let tx = self.conn.unchecked_transaction()?;
-        tx.execute(
-            "INSERT INTO events(sequence, id, project_id, kind, proposal_id, hash, raw)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-            params![
-                i64::try_from(event.sequence).map_err(|_| Error::Corrupt(
-                    "event sequence does not fit in the store".into()
-                ))?,
-                event.id.as_str(),
-                event.project_id.as_str(),
-                kind_tag(event),
-                event.proposal_id.as_ref().map(ProposalId::as_str),
-                event.hash.to_hex(),
-                raw,
-            ],
-        )?;
+        for event in batch {
+            sequence += 1;
+            if event.sequence != sequence {
+                return Err(Error::StaleSequence {
+                    expected: sequence,
+                    found: event.sequence,
+                });
+            }
+            if event.previous_hash != previous {
+                return Err(Error::StaleHash);
+            }
+            let raw = serde_json::to_string(event)?;
+            tx.execute(
+                "INSERT INTO events(sequence, id, project_id, kind, proposal_id, hash, raw)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                params![
+                    i64::try_from(event.sequence).map_err(|_| Error::Corrupt(
+                        "event sequence does not fit in the store".into()
+                    ))?,
+                    event.id.as_str(),
+                    event.project_id.as_str(),
+                    kind_tag(event),
+                    event.proposal_id.as_ref().map(ProposalId::as_str),
+                    event.hash.to_hex(),
+                    raw
+                ],
+            )?;
+            previous = event.hash;
+        }
         let events = read_events(&tx)?;
         rebuild_projection(&tx, &events)?;
         tx.commit()?;

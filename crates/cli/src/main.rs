@@ -17,6 +17,7 @@ use middleman_core::{Config, Event, EventId, Hash, ProjectId, ProposalId, TaskId
 
 mod guides;
 mod retrieval;
+mod tasks;
 
 const STATE_DIR: &str = ".middleman";
 const CONFIG_FILE: &str = "middleman.toml";
@@ -39,6 +40,8 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Commands {
+    /// Track task baselines, completion and reported validation.
+    Task(tasks::Options),
     /// Generate repository agent instructions or an observed context map.
     Render(guides::Options),
     #[command(flatten)]
@@ -57,6 +60,8 @@ enum Commands {
 
 #[derive(Debug, Error)]
 enum Failure {
+    #[error("task: {0}")]
+    Task(#[from] tasks::Error),
     #[error("guide: {0}")]
     Guide(#[from] guides::Error),
     #[error("retrieval: {0}")]
@@ -87,6 +92,7 @@ fn run(cli: &Cli) -> Result<(), Failure> {
         return Err(Failure::NotADirectory(cli.repo.clone()));
     }
     match &cli.command {
+        Commands::Task(options) => tasks::run(repo, options).map_err(Failure::from),
         Commands::Render(options) => guides::run(repo, options).map_err(Failure::from),
         Commands::Retrieval(command) => retrieval::run(repo, command).map_err(Failure::from),
         Commands::Init { name } => init(repo, name.as_deref()),
@@ -312,10 +318,14 @@ pub fn main() -> ExitCode {
     match run(&cli) {
         Ok(()) => ExitCode::SUCCESS,
         Err(failure) => {
-            if matches!(cli.command, Commands::Retrieval(_) | Commands::Render(_)) {
+            if matches!(
+                cli.command,
+                Commands::Retrieval(_) | Commands::Render(_) | Commands::Task(_)
+            ) {
                 let code = match &failure {
                     Failure::Retrieval(error) => error.code(),
                     Failure::Guide(error) => error.code(),
+                    Failure::Task(error) => error.code(),
                     _ => "invalid_repository",
                 };
                 eprintln!(

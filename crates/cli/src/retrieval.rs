@@ -110,11 +110,12 @@ impl Error {
     }
 }
 
-struct Loaded {
-    config: Config,
-    state: State,
-    graph: graph::Graph,
-    hints: BTreeMap<EntityId, Hints>,
+pub(super) struct Loaded {
+    pub(super) config: Config,
+    pub(super) state: State,
+    pub(super) graph: graph::Graph,
+    pub(super) hints: BTreeMap<EntityId, Hints>,
+    pub(super) snapshot: middleman_core::task::Snapshot,
 }
 
 pub(super) fn guide_input(
@@ -280,10 +281,14 @@ fn check_output(output: &OutputOptions) -> Result<(), Error> {
 }
 
 fn load(repo: &Path, state: State) -> Result<Loaded, Error> {
+    task_input(repo, state, true)
+}
+
+pub(super) fn task_input(repo: &Path, state: State, include_git: bool) -> Result<Loaded, Error> {
     let config = super::read_toml_config(&repo.join(super::STATE_DIR).join(super::CONFIG_FILE))
         .map_err(|_| Error::Config)?;
     let report = scan::scan(repo, &config)?;
-    let history = if repo.join(".git").exists() {
+    let history = if include_git && repo.join(".git").exists() {
         let allowed = report.files.iter().map(|file| file.path.clone()).collect();
         Some(git::scan(repo, &allowed, git::Limits::default())?)
     } else {
@@ -297,6 +302,28 @@ fn load(repo: &Path, state: State) -> Result<Loaded, Error> {
         graph::Budget::default(),
     )?;
     let mut graph = refreshed.index.graph().clone();
+    let snapshot = middleman_core::task::Snapshot {
+        files: report
+            .files
+            .iter()
+            .map(|file| {
+                (
+                    std::path::PathBuf::from(file.path.to_string_lossy().replace('\\', "/")),
+                    file.hash,
+                )
+            })
+            .collect(),
+        symbols: graph
+            .entities
+            .iter()
+            .filter(|(_, entity)| entity.kind == middleman_core::EntityKind::Symbol)
+            .map(|(id, _)| id.clone())
+            .collect(),
+        git_commit: history.as_ref().and_then(|history| history.head.clone()),
+        history_truncated: history
+            .as_ref()
+            .is_some_and(|history| history.history_truncated),
+    };
     let mut hints =
         middleman_indexer::routing::hints(&report.files, &graph, history.as_ref(), &config.limits);
     for (id, entity) in &state.entities {
@@ -340,10 +367,11 @@ fn load(repo: &Path, state: State) -> Result<Loaded, Error> {
         state,
         graph,
         hints,
+        snapshot,
     })
 }
 
-fn rank(task: &str, loaded: &Loaded, limit: usize) -> Ranking {
+pub(super) fn rank(task: &str, loaded: &Loaded, limit: usize) -> Ranking {
     let cochanges: Vec<_> = loaded
         .graph
         .cochanges

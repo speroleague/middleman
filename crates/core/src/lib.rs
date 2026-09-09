@@ -21,6 +21,7 @@ pub mod event;
 pub mod ids;
 pub mod projection;
 pub mod routing;
+pub mod task;
 
 pub use config::Config;
 pub use entity::{Edge, EdgeKind, Entity, EntityKind, EntityPayload, Evidence, Status};

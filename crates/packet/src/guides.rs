@@ -27,6 +27,10 @@ Use `middleman expand <entity-id>` for direct dependencies and tests, and\n\
 `middleman search \"<terms>\"` to find additional references. Use\n\
 `middleman explain <packet-id>` with the packet ID printed on stderr to inspect\n\
 selection reasons. Generated observations are navigation aids, not reviewed claims.\n\n\
+For material work, use `middleman task start --task \"<user request>\"` before\n\
+editing and `middleman task finish <task-id>` afterward. Use `middleman task show <task-id>`\n\
+to inspect recorded observations. Report validation through `--passed`, `--failed`\n\
+or `--skipped` only when the result is known; Middleman does not run commands.\n\n\
 Do not directly rewrite Middleman-managed durable memory. Report proposed\n\
 decisions, invariants and contract changes for review.\n"
         .into()

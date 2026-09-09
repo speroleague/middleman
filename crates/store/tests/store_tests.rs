@@ -97,6 +97,39 @@ fn open_store(dir: &Path) -> Store {
 }
 
 #[test]
+fn batch_failure_rolls_back_every_event_and_projection() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = open_store(dir.path());
+    let initial = init_event();
+    store.append(&initial).unwrap();
+    let second = indexed_event(2, initial.hash);
+    let invalid = Event::new(
+        EventId::new(id("evt_", 3)).unwrap(),
+        project_id(),
+        3,
+        OffsetDateTime::UNIX_EPOCH,
+        Actor::User,
+        EventKind::TaskCompleted {
+            task_id: middleman_core::TaskId::new(id("task_", 99)).unwrap(),
+            summary: "invalid".into(),
+            validation: vec![],
+        },
+        vec![],
+        None,
+        second.hash,
+    )
+    .unwrap();
+    assert!(store.append_batch(&[second.clone(), invalid]).is_err());
+    assert_eq!(store.tail().unwrap(), (1, Some(initial.hash)));
+    assert_eq!(store.state().unwrap().last_indexed_commit, None);
+    let third = indexed_event(3, second.hash);
+    store.append_batch(&[second, third]).unwrap();
+    assert_eq!(store.tail().unwrap().0, 3);
+    drop(store);
+    assert_eq!(Store::open(dir.path()).unwrap().events().unwrap().len(), 3);
+}
+
+#[test]
 fn derived_entity_ids_survive_event_replay_and_sqlite_reopen() {
     use middleman_core::{Entity, EntityId, EntityKind, EntityPayload, Evidence, Status};
 

@@ -98,6 +98,11 @@ pub enum EventKind {
     TaskStarted {
         task: crate::entity::Task,
     },
+    TaskObserved {
+        task_id: TaskId,
+        phase: crate::task::Phase,
+        snapshot: crate::task::Snapshot,
+    },
     TaskCompleted {
         task_id: TaskId,
         summary: String,

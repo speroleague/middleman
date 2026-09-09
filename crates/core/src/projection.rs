@@ -33,6 +33,10 @@ pub struct State {
 /// A unit of work as projected from start/complete/abandon events.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TaskRecord {
+    #[serde(default)]
+    pub baseline: Option<crate::task::Snapshot>,
+    #[serde(default)]
+    pub observations: Option<crate::task::Changes>,
     pub id: TaskId,
     pub objective: String,
     pub status: TaskStatus,
@@ -129,7 +133,17 @@ pub fn project(events: &[Event]) -> Result<State, Error> {
                 state.edges.push(edge.clone());
             }
             EventKind::TaskStarted { task } => {
+                if state.tasks.contains_key(&task.id)
+                    || !matches!(task.status, TaskStatus::Open | TaskStatus::InProgress)
+                {
+                    return Err(Error::invalid_event(
+                        event.sequence,
+                        "task already exists or is not open",
+                    ));
+                }
                 let record = TaskRecord {
+                    baseline: None,
+                    observations: None,
                     id: task.id.clone(),
                     objective: task.objective.clone(),
                     status: TaskStatus::InProgress,
@@ -143,12 +157,48 @@ pub fn project(events: &[Event]) -> Result<State, Error> {
                 };
                 state.tasks.insert(task.id.clone(), record);
             }
+            EventKind::TaskObserved {
+                task_id,
+                phase,
+                snapshot,
+            } => {
+                if !crate::task::valid(snapshot) {
+                    return Err(Error::invalid_event(
+                        event.sequence,
+                        "invalid or oversized task snapshot",
+                    ));
+                }
+                let task = open_task(&mut state, task_id, event)?;
+                match phase {
+                    crate::task::Phase::Baseline
+                        if task.baseline.is_none() && task.observations.is_none() =>
+                    {
+                        task.baseline = Some(snapshot.clone());
+                    }
+                    crate::task::Phase::Finish if task.observations.is_none() => {
+                        task.observations =
+                            Some(crate::task::compare(task.baseline.as_ref(), snapshot));
+                    }
+                    _ => {
+                        return Err(Error::invalid_event(
+                            event.sequence,
+                            "duplicate or out-of-order task observation",
+                        ));
+                    }
+                }
+            }
             EventKind::TaskCompleted {
                 task_id,
                 summary,
                 validation,
             } => {
                 if let Some(task) = state.tasks.get_mut(task_id) {
+                    if !matches!(task.status, TaskStatus::Open | TaskStatus::InProgress) {
+                        return Err(Error::invalid_event(
+                            event.sequence,
+                            "task is already terminal",
+                        ));
+                    }
                     task.status = TaskStatus::Completed;
                     task.summary.clone_from(summary);
                     task.validation_results.clone_from(validation);
@@ -162,6 +212,12 @@ pub fn project(events: &[Event]) -> Result<State, Error> {
             }
             EventKind::TaskAbandoned { task_id, reason } => {
                 if let Some(task) = state.tasks.get_mut(task_id) {
+                    if !matches!(task.status, TaskStatus::Open | TaskStatus::InProgress) {
+                        return Err(Error::invalid_event(
+                            event.sequence,
+                            "task is already terminal",
+                        ));
+                    }
                     task.status = TaskStatus::Abandoned;
                     task.summary.clone_from(reason);
                     task.finished_at = Some(event.occurred_at);
@@ -238,6 +294,18 @@ pub fn project(events: &[Event]) -> Result<State, Error> {
     }
 
     Ok(state)
+}
+
+fn open_task<'a>(
+    state: &'a mut State,
+    id: &TaskId,
+    event: &Event,
+) -> Result<&'a mut TaskRecord, Error> {
+    state
+        .tasks
+        .get_mut(id)
+        .filter(|task| matches!(task.status, TaskStatus::Open | TaskStatus::InProgress))
+        .ok_or_else(|| Error::invalid_event(event.sequence, "task is missing or terminal"))
 }
 
 fn upsert_claim(
