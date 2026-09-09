@@ -45,7 +45,7 @@ apply, reject) with export/import/backup/restore.
 - [x] indexer: language + git stage
 - [x] indexer: derived graph + incremental refresh
 - [x] core: classification and scoring
-- [ ] packet: Context IR + renderers + budgets
+- [x] packet: Context IR + renderers + budgets
 - [ ] cli: prepare, expand, search, explain (spec 16.1 exit)
 - [ ] cli: render agents-md, agent-context
 - [ ] cli: task start/finish with automatic observations
@@ -79,7 +79,9 @@ apply, reject) with export/import/backup/restore.
   for the API, cache/evidence contracts, validation and known limits.
 - Core classification/scoring is complete; see [the routing handoff](003-classification-scoring.md)
   for signals, ranking, confidence, validation and adapter responsibilities.
-  Next: Context IR, renderers and budgets.
+  Packet rendering is complete; see [the packet handoff](004-context-packets.md)
+  for CIR grammar, budget semantics and validation. Next: CLI prepare, expand,
+  search and explain.
 
 ## Language and Git slice
 

@@ -10,3 +10,11 @@
 //! - Every rendered item keeps its selection reason so `explain` can
 //!   show why it was included or left out.
 //! - Never invents content: renders core data only.
+
+mod codec;
+mod model;
+mod selection;
+
+pub use codec::{estimate, parse_cir, render};
+pub use model::{Error, Format, Header, Item, Packet, Reference};
+pub use selection::{Limits, Output, prepare};
