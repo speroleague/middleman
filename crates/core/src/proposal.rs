@@ -4,7 +4,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
-use crate::{Entity, EntityId, EntityKind, EntityPayload, Evidence, State, Status, TaskId};
+use crate::{
+    ClaimDetails, Entity, EntityId, EntityKind, EntityPayload, Evidence, State, Status, TaskId,
+};
 
 pub const MAX_CLAIMS: usize = 32;
 const MAX_SCOPE: usize = 32;
@@ -30,6 +32,7 @@ pub enum Code {
     EmptyDraft,
     UnsupportedKind,
     InvalidText,
+    InvalidDetails,
     DuplicateDraft,
     MissingTask,
     MissingScope,
@@ -124,6 +127,7 @@ pub fn validate(draft: &Draft, state: &State) -> Report {
             task_scope.map(|task| &task.scope),
         );
         validate_evidence(&mut report, index, claim.evidence.as_slice(), &known_paths);
+        validate_details(&mut report, index, draft_claim, &known_paths);
         validate_existing(&mut report, index, draft_claim, &state.entities);
         for id in &claim.scope {
             if let Some(entity) = state.entities.get(id) {
@@ -134,6 +138,41 @@ pub fn validate(draft: &Draft, state: &State) -> Report {
         }
     }
     report
+}
+
+fn validate_details(
+    report: &mut Report,
+    index: usize,
+    draft: &DraftClaim,
+    known_paths: &BTreeSet<String>,
+) {
+    let valid = match (&draft.kind, &draft.claim.details) {
+        (EntityKind::Decision, None | Some(ClaimDetails::Decision { .. })) => true,
+        (EntityKind::Invariant, Some(ClaimDetails::Invariant { consequence })) => {
+            text(consequence, MAX_TEXT)
+        }
+        (
+            EntityKind::Contract,
+            Some(ClaimDetails::Contract {
+                input,
+                output,
+                path,
+                ..
+            }),
+        ) => {
+            text(input, MAX_TEXT)
+                && text(output, MAX_TEXT)
+                && path
+                    .as_ref()
+                    .is_none_or(|path| known_paths.contains(&path_key(path)))
+        }
+        _ => false,
+    };
+    if !valid {
+        report
+            .errors
+            .push(issue(Code::InvalidDetails, Some(index), vec![]));
+    }
 }
 
 fn validate_scope(

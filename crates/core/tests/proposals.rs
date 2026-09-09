@@ -64,6 +64,9 @@ fn draft(scope: Vec<EntityId>, evidence: Vec<Evidence>) -> Draft {
                 rationale: Some("Protect exclusivity".into()),
                 scope,
                 evidence,
+                details: Some(middleman_core::ClaimDetails::Invariant {
+                    consequence: "Renewal exclusivity is preserved.".into(),
+                }),
             },
         }],
     }

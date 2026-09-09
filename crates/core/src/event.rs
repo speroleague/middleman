@@ -43,6 +43,28 @@ pub struct Claim {
     pub rationale: Option<String>,
     pub scope: Vec<EntityId>,
     pub evidence: Vec<crate::entity::Evidence>,
+    #[serde(default)]
+    pub details: Option<ClaimDetails>,
+}
+
+/// Kind-specific fields retained until a reviewed claim becomes an entity.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ClaimDetails {
+    Decision {
+        owner: Option<String>,
+        supersedes: Option<EntityId>,
+    },
+    Invariant {
+        consequence: String,
+    },
+    Contract {
+        input: String,
+        output: String,
+        compatibility: Option<String>,
+        owner: Option<String>,
+        path: Option<std::path::PathBuf>,
+    },
 }
 
 /// One append-only log entry. The hash covers every other field plus the
@@ -454,6 +476,7 @@ mod tests {
                     rationale: None,
                     scope: Vec::new(),
                     evidence: Vec::new(),
+                    details: None,
                 },
             },
             Vec::new(),

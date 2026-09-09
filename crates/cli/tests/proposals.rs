@@ -78,11 +78,34 @@ fn structured_claims_are_validated_then_appended_as_one_pending_proposal() {
     assert!(output["proposal_id"].as_str().unwrap().starts_with("prop_"));
     assert_eq!(output["status"], "pending_review");
     assert_eq!(output["claims"][0]["kind"], "decision");
+    let id = output["proposal_id"].as_str().unwrap();
+    let review = success(repo.path(), &["review", id]);
+    assert_eq!(review["status"], "pending_review");
+    let accepted = success(repo.path(), &["apply", id]);
+    assert_eq!(accepted["status"], "accepted");
+    assert_eq!(accepted["entities"][0]["kind"], "decision");
 
     let store = middleman_store::Store::open_read_only(&repo.path().join(".middleman")).unwrap();
     let state = middleman_core::project(&store.events().unwrap()).unwrap();
     assert_eq!(state.proposals.len(), 1);
-    assert_eq!(state.proposals.values().next().unwrap().claims.len(), 1);
+    let proposal = state.proposals.values().next().unwrap();
+    assert_eq!(proposal.claims.len(), 1);
+    assert!(proposal.accepted);
+    assert_eq!(
+        state
+            .entities
+            .values()
+            .filter(|entity| entity.kind == middleman_core::EntityKind::Decision)
+            .count(),
+        1
+    );
+    drop(store);
+    let applied_twice = run(repo.path(), &["apply", id]);
+    assert!(!applied_twice.status.success());
+    assert_eq!(
+        serde_json::from_slice::<Value>(&applied_twice.stderr).unwrap()["error"]["code"],
+        "proposal_terminal"
+    );
 }
 
 #[test]
@@ -149,7 +172,20 @@ fn git_evidence_is_attached_without_executing_repository_source() {
     let task = success(repo.path(), &["task", "start", "--task", "lease behavior"]);
     let source = input(
         repo.path(),
-        &json!({"invariants": [claim("Leases must use PostgreSQL time.")]}),
+        &json!({"invariants": [{
+            "label": "Lease clock",
+            "statement": "Leases must use PostgreSQL time.",
+            "rationale": "Maintains a single authority.",
+            "scope": [],
+            "evidence": [{
+                "type": "source_span",
+                "path": "src/lib.rs",
+                "start_line": 1,
+                "end_line": 1,
+                "content_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }],
+            "details": {"type": "invariant", "consequence": "Lease timestamps stay comparable."}
+        }]}),
     );
 
     let output = success(
@@ -169,4 +205,35 @@ fn git_evidence_is_attached_without_executing_repository_source() {
     assert_eq!(evidence[1]["type"], "git_commit");
     assert_eq!(evidence[1]["sha"].as_str().unwrap().len(), 40);
     assert!(output["git_evidence_attached"].as_bool().unwrap());
+}
+
+#[test]
+fn pending_proposals_can_be_rejected_once_with_a_reason() {
+    let repo = repo();
+    let task = success(repo.path(), &["task", "start", "--task", "lease behavior"]);
+    let source = input(
+        repo.path(),
+        &json!({"decisions": [claim("PostgreSQL time is authoritative for leases.")]}),
+    );
+    let proposal = success(
+        repo.path(),
+        &[
+            "propose",
+            "--task-id",
+            task["id"].as_str().unwrap(),
+            "--input",
+            &source,
+        ],
+    );
+    let id = proposal["proposal_id"].as_str().unwrap();
+    let rejected = success(repo.path(), &["reject", id, "--reason", "already covered"]);
+    assert_eq!(rejected["status"], "rejected");
+    let review = success(repo.path(), &["review", id]);
+    assert_eq!(review["status"], "rejected");
+    let applied = run(repo.path(), &["apply", id]);
+    assert!(!applied.status.success());
+    assert_eq!(
+        serde_json::from_slice::<Value>(&applied.stderr).unwrap()["error"]["code"],
+        "proposal_terminal"
+    );
 }

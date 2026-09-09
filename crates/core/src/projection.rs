@@ -57,6 +57,8 @@ pub struct ProposalRecord {
     pub task_id: Option<TaskId>,
     pub claims: Vec<ProposedClaim>,
     pub created_at: OffsetDateTime,
+    #[serde(default)]
+    pub accepted: bool,
     pub rejected: bool,
     pub rejection_reason: String,
 }
@@ -259,6 +261,11 @@ pub fn project(events: &[Event]) -> Result<State, Error> {
             | EventKind::InvariantAccepted { entity }
             | EventKind::ContractAccepted { entity } => {
                 state.entities.insert(entity.id.clone(), entity.clone());
+                if let Some(id) = &event.proposal_id {
+                    if let Some(proposal) = state.proposals.get_mut(id) {
+                        proposal.accepted = true;
+                    }
+                }
             }
             EventKind::EvidenceAttached {
                 entity_id,
@@ -327,6 +334,7 @@ fn upsert_claim(
             task_id: task_id.cloned(),
             claims: Vec::new(),
             created_at: event.occurred_at,
+            accepted: false,
             rejected: false,
             rejection_reason: String::new(),
         });
@@ -392,6 +400,7 @@ mod tests {
             rationale: None,
             scope: Vec::new(),
             evidence: Vec::new(),
+            details: None,
         }
     }
 

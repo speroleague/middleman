@@ -7,7 +7,8 @@ use std::{
 
 use clap::{Args, ValueEnum};
 use middleman_core::{
-    Actor, Claim, EntityKind, Event, EventId, EventKind, Evidence, Hash, ProposalId, State, TaskId,
+    Actor, Claim, ClaimDetails, Entity, EntityId, EntityKind, EntityPayload, Event, EventId,
+    EventKind, Evidence, Hash, ProposalId, ProposalRecord, State, Status, TaskId,
     proposal::{self, Draft, DraftClaim, Report},
     task,
 };
@@ -57,6 +58,14 @@ pub enum Error {
     NotInitialized,
     #[error("current Git evidence is unavailable")]
     GitUnavailable,
+    #[error("proposal was not found")]
+    NotFound,
+    #[error("proposal is already accepted or rejected")]
+    Terminal,
+    #[error("proposal cannot become typed durable entities")]
+    CannotApply,
+    #[error("rejection reason is invalid or exceeds its limit")]
+    InvalidReason,
     #[error("proposal validation failed")]
     InvalidDraft { report: Report },
     #[error("storage: {0}")]
@@ -72,9 +81,12 @@ pub enum Error {
 impl Error {
     pub const fn code(&self) -> &'static str {
         match self {
-            Self::InvalidInput | Self::Json(_) => "invalid_input",
+            Self::InvalidInput | Self::Json(_) | Self::InvalidReason => "invalid_input",
             Self::NotInitialized => "not_initialized",
             Self::GitUnavailable => "git_unavailable",
+            Self::NotFound => "proposal_not_found",
+            Self::Terminal => "proposal_terminal",
+            Self::CannotApply => "proposal_not_applicable",
             Self::InvalidDraft { .. } => "invalid_proposal",
             Self::Store(_) => "storage_error",
             Self::Core(_) => "domain_error",
@@ -122,6 +134,215 @@ pub fn run(repo: &Path, options: &Options) -> Result<(), Error> {
     let events = events(&draft, &loaded.state, &id)?;
     Store::open(&state_dir)?.append_batch(&events)?;
     render(options.format, &id, &draft, &report, options.from_git)
+}
+
+pub fn review(repo: &Path, raw_id: &str) -> Result<(), Error> {
+    let id = proposal_id(raw_id)?;
+    let state = state(repo)?;
+    let record = state.proposals.get(&id).ok_or(Error::NotFound)?;
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&serde_json::json!({
+            "proposal": record,
+            "status": status(record),
+            "review_required": !record.accepted && !record.rejected
+        }))?
+    );
+    Ok(())
+}
+
+pub fn apply(repo: &Path, raw_id: &str) -> Result<(), Error> {
+    let id = proposal_id(raw_id)?;
+    let state = state(repo)?;
+    let record = state.proposals.get(&id).ok_or(Error::NotFound)?;
+    pending(record)?;
+    let entities: Result<Vec<_>, _> = record
+        .claims
+        .iter()
+        .enumerate()
+        .map(|(index, claim)| entity(&id, index, claim))
+        .collect();
+    let entities = entities?;
+    let events = accepted_events(&state, &id, &entities)?;
+    Store::open(&repo.join(super::STATE_DIR))?.append_batch(&events)?;
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&serde_json::json!({
+            "proposal_id": id,
+            "status": "accepted",
+            "entities": entities
+        }))?
+    );
+    Ok(())
+}
+
+pub fn reject(repo: &Path, raw_id: &str, reason: &str) -> Result<(), Error> {
+    if reason.trim().is_empty() || reason.len() > 4096 || reason.chars().any(char::is_control) {
+        return Err(Error::InvalidReason);
+    }
+    let id = proposal_id(raw_id)?;
+    let state = state(repo)?;
+    let record = state.proposals.get(&id).ok_or(Error::NotFound)?;
+    pending(record)?;
+    let event = Event::new(
+        EventId::new(format!("evt_{}", ulid::Ulid::generate()))?,
+        state.project_id.clone().ok_or(Error::NotInitialized)?,
+        state.last_sequence + 1,
+        time::OffsetDateTime::now_utc(),
+        Actor::User,
+        EventKind::ProposalRejected {
+            reason: reason.to_owned(),
+        },
+        vec![],
+        Some(id.clone()),
+        state.last_hash.unwrap_or(Hash::genesis()),
+    )?;
+    Store::open(&repo.join(super::STATE_DIR))?.append(&event)?;
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&serde_json::json!({
+            "proposal_id": id,
+            "status": "rejected",
+            "reason": reason
+        }))?
+    );
+    Ok(())
+}
+
+fn state(repo: &Path) -> Result<State, Error> {
+    let state_dir = repo.join(super::STATE_DIR);
+    if !state_dir.join(super::STATE_DB).is_file() {
+        return Err(Error::NotInitialized);
+    }
+    let store = Store::open_read_only(&state_dir)?;
+    Ok(middleman_core::project(&store.events()?)?)
+}
+
+fn proposal_id(value: &str) -> Result<ProposalId, Error> {
+    ProposalId::new(value).map_err(|_| Error::InvalidInput)
+}
+
+fn pending(record: &ProposalRecord) -> Result<(), Error> {
+    if record.accepted || record.rejected {
+        return Err(Error::Terminal);
+    }
+    Ok(())
+}
+
+const fn status(record: &ProposalRecord) -> &'static str {
+    if record.accepted {
+        "accepted"
+    } else if record.rejected {
+        "rejected"
+    } else {
+        "pending_review"
+    }
+}
+
+fn entity(
+    proposal_id: &ProposalId,
+    index: usize,
+    proposed: &middleman_core::ProposedClaim,
+) -> Result<Entity, Error> {
+    let component = index.to_string();
+    let (namespace, payload) = match (&proposed.kind, &proposed.claim.details) {
+        (EntityKind::Decision, None) => (
+            "dec",
+            EntityPayload::Decision {
+                statement: proposed.claim.statement.clone(),
+                rationale: proposed.claim.rationale.clone(),
+                owner: None,
+                supersedes: None,
+            },
+        ),
+        (EntityKind::Decision, Some(ClaimDetails::Decision { owner, supersedes })) => (
+            "dec",
+            EntityPayload::Decision {
+                statement: proposed.claim.statement.clone(),
+                rationale: proposed.claim.rationale.clone(),
+                owner: owner.clone(),
+                supersedes: supersedes.clone(),
+            },
+        ),
+        (EntityKind::Invariant, Some(ClaimDetails::Invariant { consequence })) => (
+            "inv",
+            EntityPayload::Invariant {
+                statement: proposed.claim.statement.clone(),
+                consequence: consequence.clone(),
+            },
+        ),
+        (
+            EntityKind::Contract,
+            Some(ClaimDetails::Contract {
+                input,
+                output,
+                compatibility,
+                owner,
+                path,
+            }),
+        ) => (
+            "con",
+            EntityPayload::Contract {
+                what: proposed.claim.statement.clone(),
+                input: input.clone(),
+                output: output.clone(),
+                compatibility: compatibility.clone(),
+                owner: owner.clone(),
+                path: path.clone(),
+            },
+        ),
+        _ => return Err(Error::CannotApply),
+    };
+    Ok(Entity::new(
+        EntityId::derived(namespace, &[proposal_id.as_str(), &component])?,
+        proposed.kind,
+        Status::Active,
+        proposed.claim.label.clone(),
+        payload,
+        proposed.claim.evidence.clone(),
+    )?)
+}
+
+fn accepted_events(
+    state: &State,
+    proposal_id: &ProposalId,
+    entities: &[Entity],
+) -> Result<Vec<Event>, Error> {
+    let project_id = state.project_id.clone().ok_or(Error::NotInitialized)?;
+    let mut previous = state.last_hash.unwrap_or(Hash::genesis());
+    let mut sequence = state.last_sequence;
+    let at = time::OffsetDateTime::now_utc();
+    entities
+        .iter()
+        .map(|entity| {
+            sequence += 1;
+            let kind = match entity.kind {
+                EntityKind::Decision => EventKind::DecisionAccepted {
+                    entity: entity.clone(),
+                },
+                EntityKind::Invariant => EventKind::InvariantAccepted {
+                    entity: entity.clone(),
+                },
+                EntityKind::Contract => EventKind::ContractAccepted {
+                    entity: entity.clone(),
+                },
+                _ => return Err(Error::CannotApply),
+            };
+            let event = Event::new(
+                EventId::new(format!("evt_{}", ulid::Ulid::generate()))?,
+                project_id.clone(),
+                sequence,
+                at,
+                Actor::User,
+                kind,
+                vec![],
+                Some(proposal_id.clone()),
+                previous,
+            )?;
+            previous = event.hash;
+            Ok(event)
+        })
+        .collect()
 }
 
 fn read_input(path: &Path) -> Result<Input, Error> {

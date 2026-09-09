@@ -27,6 +27,6 @@ pub mod task;
 pub use config::Config;
 pub use entity::{Edge, EdgeKind, Entity, EntityKind, EntityPayload, Evidence, Status};
 pub use error::Error;
-pub use event::{Actor, Claim, Event, EventKind, RetrievalSignal};
+pub use event::{Actor, Claim, ClaimDetails, Event, EventKind, RetrievalSignal};
 pub use ids::{EntityId, EventId, Hash, ProjectId, ProposalId, TaskId};
 pub use projection::{ProposalRecord, ProposedClaim, RetrievalRecord, State, TaskRecord, project};

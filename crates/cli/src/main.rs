@@ -45,6 +45,16 @@ enum Commands {
     Task(tasks::Options),
     /// Validate and record explicit durable-memory proposals for review.
     Propose(proposals::Options),
+    /// Render a pending proposal without changing durable state.
+    Review { id: String },
+    /// Accept a reviewed proposal as active typed entities.
+    Apply { id: String },
+    /// Reject a pending proposal with a durable reason.
+    Reject {
+        id: String,
+        #[arg(long)]
+        reason: String,
+    },
     /// Generate repository agent instructions or an observed context map.
     Render(guides::Options),
     #[command(flatten)]
@@ -99,6 +109,11 @@ fn run(cli: &Cli) -> Result<(), Failure> {
     match &cli.command {
         Commands::Task(options) => tasks::run(repo, options).map_err(Failure::from),
         Commands::Propose(options) => proposals::run(repo, options).map_err(Failure::from),
+        Commands::Review { id } => proposals::review(repo, id).map_err(Failure::from),
+        Commands::Apply { id } => proposals::apply(repo, id).map_err(Failure::from),
+        Commands::Reject { id, reason } => {
+            proposals::reject(repo, id, reason).map_err(Failure::from)
+        }
         Commands::Render(options) => guides::run(repo, options).map_err(Failure::from),
         Commands::Retrieval(command) => retrieval::run(repo, command).map_err(Failure::from),
         Commands::Init { name } => init(repo, name.as_deref()),
@@ -179,7 +194,7 @@ fn status(repo: &Path) -> Result<(), Failure> {
     let store = middleman_store::Store::open(&state_dir)?;
     let state = store.state()?;
     let (open, completed, abandoned) = task_tally(&state.tasks);
-    let (pending, rejected) = proposal_tally(&state.proposals);
+    let (pending, accepted, rejected) = proposal_tally(&state.proposals);
 
     println!("project:   {}", state.project_name);
     println!("state:     {}", state_dir.join(STATE_DB).display());
@@ -200,7 +215,7 @@ fn status(repo: &Path) -> Result<(), Failure> {
     println!("entities:  {}", state.entities.len());
     println!("edges:     {}", state.edges.len());
     println!("tasks:     {open} open, {completed} completed, {abandoned} abandoned");
-    println!("proposals: {pending} pending, {rejected} rejected");
+    println!("proposals: {pending} pending, {accepted} accepted, {rejected} rejected");
     Ok(())
 }
 
@@ -224,10 +239,14 @@ fn task_tally(tasks: &BTreeMap<TaskId, TaskRecord>) -> (usize, usize, usize) {
 /// Splits the proposal records into pending and rejected counts.
 fn proposal_tally(
     proposals: &BTreeMap<ProposalId, middleman_core::ProposalRecord>,
-) -> (usize, usize) {
-    let pending = proposals.values().filter(|p| !p.rejected).count();
+) -> (usize, usize, usize) {
+    let pending = proposals
+        .values()
+        .filter(|p| !p.rejected && !p.accepted)
+        .count();
+    let accepted = proposals.values().filter(|p| p.accepted).count();
     let rejected = proposals.values().filter(|p| p.rejected).count();
-    (pending, rejected)
+    (pending, accepted, rejected)
 }
 
 fn doctor(repo: &Path) -> Result<(), Failure> {
@@ -330,6 +349,9 @@ pub fn main() -> ExitCode {
                     | Commands::Render(_)
                     | Commands::Task(_)
                     | Commands::Propose(_)
+                    | Commands::Review { .. }
+                    | Commands::Apply { .. }
+                    | Commands::Reject { .. }
             ) {
                 let code = match &failure {
                     Failure::Retrieval(error) => error.code(),
