@@ -20,6 +20,7 @@ pub mod error;
 pub mod event;
 pub mod ids;
 pub mod projection;
+pub mod proposal;
 pub mod routing;
 pub mod task;
 
