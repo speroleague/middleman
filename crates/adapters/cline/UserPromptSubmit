@@ -1,0 +1,4 @@
+#!/usr/bin/env node
+import { runHook } from "./middleman-hook-entry.mjs";
+
+await runHook("UserPromptSubmit");

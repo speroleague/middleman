@@ -5,7 +5,7 @@ import {
   DEFAULT_PACKET_BUDGET,
   UNAVAILABLE_FALLBACK,
   createLifecycle,
-} from "./middleman-lifecycle.mjs";
+} from "../shared/middleman-lifecycle.mjs";
 
 function runner(replies) {
   const calls = [];
