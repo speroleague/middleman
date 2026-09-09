@@ -54,7 +54,7 @@ apply, reject) with export/import/backup/restore.
 - [x] cli: review, apply, reject
 - [x] cli: export, import, backup, restore
 - [x] cli/store: standalone index command and persistent incremental snapshots
-- [ ] docs: agent guide answers + phase 3-5 handoff (spec 16.2 exit)
+- [x] docs: agent guide answers + phase 3-5 handoff
 
 ## Changes made
 
@@ -95,7 +95,9 @@ apply, reject) with export/import/backup/restore.
   rejection and terminal-state rules. State transfer is complete; see
   [the transfer handoff](011-state-transfer.md). Indexing is complete; see
   [the persistent-index handoff](012-persistent-index.md). Next: finish the
-  Phase 2 agent-guide answers and record the Phase 3-5 harness handoff.
+  Phase 2 exit test: two separate sessions must complete related work using only
+  the broker packet and reviewed state. Phase 3-5 implementation begins only
+  after that validation; see [the harness handoff](013-phase-3-5-handoff.md).
 
 ## Language and Git slice
 

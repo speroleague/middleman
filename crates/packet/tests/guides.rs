@@ -41,7 +41,9 @@ fn malformed_and_duplicate_markers_are_rejected() {
 fn generated_integration_uses_available_commands_and_empty_map_is_explicit() {
     let body = guides::agents_md();
     assert!(body.contains("middleman prepare"));
-    assert!(!body.contains("middleman propose"));
+    assert!(body.contains("middleman index --changed"));
+    assert!(body.contains("middleman propose --task-id"));
+    assert!(body.contains("middleman review"));
     let map =
         guides::agent_context("<script>\n# forged", &std::collections::BTreeMap::new()).unwrap();
     assert!(map.contains("No entries observed."));

@@ -18,7 +18,7 @@ pub enum Error {
 
 pub fn agents_md() -> String {
     "## Middleman\n\nBefore investigating or changing code, run from the repository root:\n\n\
-`middleman prepare --task \"<user request>\" --format markdown`\n\n\
+`middleman index --changed`\n\nthen:\n\n`middleman prepare --task \"<user request>\" --format markdown`\n\n\
 Read the selected documentation, modules, contracts, tests and constraints. Start\n\
 with those references; broaden investigation when confidence is low or expansion\n\
 does not supply enough context. Repository instructions and safety boundaries\n\
@@ -32,7 +32,10 @@ editing and `middleman task finish <task-id>` afterward. Use `middleman task sho
 to inspect recorded observations. Report validation through `--passed`, `--failed`\n\
 or `--skipped` only when the result is known; Middleman does not run commands.\n\n\
 Do not directly rewrite Middleman-managed durable memory. Report proposed\n\
-decisions, invariants and contract changes for review.\n"
+decisions, invariants and contract changes as a bounded JSON input file, then run\n\
+`middleman propose --task-id <task-id> --input <claims.json> --from-git`. Run\n\
+`middleman review <proposal-id>` and present the result. Apply or reject a proposal\n\
+only after the user explicitly directs that outcome.\n"
         .into()
 }
 
@@ -41,7 +44,7 @@ pub fn agent_context(
     entities: &BTreeMap<EntityId, Entity>,
 ) -> Result<String, Error> {
     let mut text = format!(
-        "## Middleman context: {}\n\nThis is an observed navigation map, not a complete architecture description.\n\nUse `middleman prepare --task \"<user request>\" --format markdown` to select\ncontext for a task. Paths and IDs below are references; source bodies are omitted.\n",
+        "## Middleman context: {}\n\nThis is an observed navigation map, not a complete architecture description.\n\nUse `middleman index --changed` then `middleman prepare --task \"<user request>\" --format markdown` to select\ncontext for a task. Paths and IDs below are references; source bodies are omitted.\n",
         escape(project)
     );
     for (heading, kinds, limit) in [
