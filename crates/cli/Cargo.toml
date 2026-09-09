@@ -18,6 +18,7 @@ middleman-indexer = { workspace = true }
 middleman-packet = { workspace = true }
 middleman-store = { workspace = true }
 clap = { workspace = true }
+serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 time = { workspace = true }

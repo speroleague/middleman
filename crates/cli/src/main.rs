@@ -16,6 +16,7 @@ use middleman_core::entity::TaskStatus;
 use middleman_core::{Config, Event, EventId, Hash, ProjectId, ProposalId, TaskId, TaskRecord};
 
 mod guides;
+mod proposals;
 mod retrieval;
 mod tasks;
 
@@ -42,6 +43,8 @@ struct Cli {
 enum Commands {
     /// Track task baselines, completion and reported validation.
     Task(tasks::Options),
+    /// Validate and record explicit durable-memory proposals for review.
+    Propose(proposals::Options),
     /// Generate repository agent instructions or an observed context map.
     Render(guides::Options),
     #[command(flatten)]
@@ -62,6 +65,8 @@ enum Commands {
 enum Failure {
     #[error("task: {0}")]
     Task(#[from] tasks::Error),
+    #[error("proposal: {0}")]
+    Proposal(#[from] proposals::Error),
     #[error("guide: {0}")]
     Guide(#[from] guides::Error),
     #[error("retrieval: {0}")]
@@ -93,6 +98,7 @@ fn run(cli: &Cli) -> Result<(), Failure> {
     }
     match &cli.command {
         Commands::Task(options) => tasks::run(repo, options).map_err(Failure::from),
+        Commands::Propose(options) => proposals::run(repo, options).map_err(Failure::from),
         Commands::Render(options) => guides::run(repo, options).map_err(Failure::from),
         Commands::Retrieval(command) => retrieval::run(repo, command).map_err(Failure::from),
         Commands::Init { name } => init(repo, name.as_deref()),
@@ -320,17 +326,25 @@ pub fn main() -> ExitCode {
         Err(failure) => {
             if matches!(
                 cli.command,
-                Commands::Retrieval(_) | Commands::Render(_) | Commands::Task(_)
+                Commands::Retrieval(_)
+                    | Commands::Render(_)
+                    | Commands::Task(_)
+                    | Commands::Propose(_)
             ) {
                 let code = match &failure {
                     Failure::Retrieval(error) => error.code(),
                     Failure::Guide(error) => error.code(),
                     Failure::Task(error) => error.code(),
+                    Failure::Proposal(error) => error.code(),
                     _ => "invalid_repository",
+                };
+                let report = match &failure {
+                    Failure::Proposal(error) => error.report(),
+                    _ => None,
                 };
                 eprintln!(
                     "{}",
-                    serde_json::json!({"error": {"code": code, "message": failure.to_string()}})
+                    serde_json::json!({"error": {"code": code, "message": failure.to_string()}, "report": report})
                 );
                 return ExitCode::FAILURE;
             }

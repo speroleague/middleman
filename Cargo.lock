@@ -516,6 +516,7 @@ dependencies = [
  "middleman-indexer",
  "middleman-packet",
  "middleman-store",
+ "serde",
  "serde_json",
  "tempfile",
  "thiserror",

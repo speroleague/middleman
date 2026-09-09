@@ -50,7 +50,7 @@ apply, reject) with export/import/backup/restore.
 - [x] cli: render agents-md, agent-context
 - [x] cli: task start/finish with automatic observations
 - [x] core: proposal validation
-- [ ] cli: propose from-git / structured input
+- [x] cli: propose from-git / structured input
 - [ ] cli: review, apply, reject
 - [ ] cli: export, import, backup, restore
 - [ ] cli/store: standalone index command and persistent incremental snapshots
@@ -89,7 +89,9 @@ apply, reject) with export/import/backup/restore.
   see [the lifecycle handoff](007-task-lifecycle.md) for atomic batches, observations,
   privacy and validation. Proposal validation is complete; see [the validation handoff]
   (008-proposal-validation.md) for deterministic checks and CLI integration constraints.
-  Next: propose, review, apply, and reject. Standalone index/persistent snapshot work
+  Proposal intake is complete; see [the intake handoff](009-proposal-intake.md) for
+  structured input, Git evidence, atomicity and validation. Next: review, apply, and
+  reject. Standalone index/persistent snapshot work
   is explicitly tracked above before final phase-exit validation.
 
 ## Language and Git slice
