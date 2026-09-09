@@ -70,6 +70,9 @@ pub struct Hints {
     pub recent: bool,
     pub ignored: bool,
     pub stale_penalty: u16,
+    /// Bounded, local outcome adjustment. It can only reorder candidates that
+    /// already have deterministic routing evidence.
+    pub learned_adjustment: i16,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -109,6 +112,8 @@ pub struct Candidate {
     pub score: i32,
     pub signals: BTreeSet<Signal>,
     pub stale_penalty: u16,
+    #[serde(default)]
+    pub learned_adjustment: i16,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -138,6 +143,7 @@ pub struct Context<'a> {
 }
 
 #[must_use]
+#[allow(clippy::too_many_lines)]
 pub fn rank(request: &str, mode: Option<Mode>, context: &Context<'_>, limit: usize) -> Ranking {
     let classification = classify(request, mode);
     let normalized = request.replace('\\', "/");
@@ -171,6 +177,7 @@ pub fn rank(request: &str, mode: Option<Mode>, context: &Context<'_>, limit: usi
                 score: 0,
                 signals,
                 stale_penalty: hints.stale_penalty,
+                learned_adjustment: hints.learned_adjustment,
             },
         );
     }
@@ -211,10 +218,11 @@ pub fn rank(request: &str, mode: Option<Mode>, context: &Context<'_>, limit: usi
                 .iter()
                 .map(|signal| signal.weight())
                 .sum::<i32>()
-                - i32::from(candidate.stale_penalty);
+                - i32::from(candidate.stale_penalty)
+                + i32::from(candidate.learned_adjustment);
             candidate
         })
-        .filter(|candidate| candidate.score > 0)
+        .filter(|candidate| !candidate.signals.is_empty() && candidate.score > 0)
         .collect();
     candidates.sort_by(|a, b| b.score.cmp(&a.score).then_with(|| a.id.cmp(&b.id)));
     let truncated = candidates.len() > limit;
@@ -370,6 +378,7 @@ pub fn expand(id: &EntityId, context: &Context<'_>) -> Ranking {
             score: signal.weight(),
             signals: BTreeSet::from([signal]),
             stale_penalty: 0,
+            learned_adjustment: 0,
         })
         .collect();
     candidates.sort_by(|a, b| b.score.cmp(&a.score).then_with(|| a.id.cmp(&b.id)));

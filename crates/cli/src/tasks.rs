@@ -117,18 +117,19 @@ pub fn run(repo: &Path, options: &Options) -> Result<(), Error> {
             let loaded = super::retrieval::task_input(repo, state.clone(), *from_git)?;
             let changes = task::compare(record.baseline.as_ref(), &loaded.snapshot);
             let summary = summary.clone().unwrap_or_else(|| task::summary(&changes));
-            let kinds = vec![
+            let mut kinds = vec![
                 EventKind::TaskObserved {
                     task_id: id.clone(),
                     phase: Phase::Finish,
-                    snapshot: loaded.snapshot,
+                    snapshot: loaded.snapshot.clone(),
                 },
                 EventKind::TaskCompleted {
                     task_id: id.clone(),
                     summary,
-                    validation,
+                    validation: validation.clone(),
                 },
             ];
+            kinds.extend(outcome_events(&loaded, record, &changes, &validation, &id));
             append(repo, &state, kinds, &id)
         }
         Command::Show { id } => {
@@ -138,6 +139,51 @@ pub fn run(repo: &Path, options: &Options) -> Result<(), Error> {
             Ok(())
         }
     }
+}
+
+fn outcome_events(
+    loaded: &super::retrieval::Loaded,
+    task: &middleman_core::TaskRecord,
+    changes: &task::Changes,
+    validation: &[ValidationResult],
+    task_id: &TaskId,
+) -> Vec<EventKind> {
+    let changed_paths: BTreeSet<_> = changes
+        .added
+        .iter()
+        .chain(&changes.changed)
+        .map(|path| path.to_string_lossy().replace('\\', "/"))
+        .collect();
+    let passed = validation
+        .iter()
+        .any(|result| result.status == ValidationStatus::Passed);
+    task.scope
+        .iter()
+        .filter_map(|id| {
+            let entity = loaded.graph.entities.get(id)?;
+            let path = middleman_indexer::routing::entity_path(&entity.payload)?;
+            let overlaps = changed_paths.contains(&path.to_string_lossy().replace('\\', "/"));
+            let test_overlap =
+                entity.kind == middleman_core::EntityKind::Test && overlaps && passed;
+            let mut events = Vec::new();
+            if overlaps {
+                events.push(EventKind::RetrievalObserved {
+                    task_id: Some(task_id.clone()),
+                    node_id: id.clone(),
+                    signal: middleman_core::RetrievalSignal::FileOverlap,
+                });
+            }
+            if test_overlap {
+                events.push(EventKind::RetrievalObserved {
+                    task_id: Some(task_id.clone()),
+                    node_id: id.clone(),
+                    signal: middleman_core::RetrievalSignal::TestOverlap,
+                });
+            }
+            Some(events)
+        })
+        .flatten()
+        .collect()
 }
 
 fn start(

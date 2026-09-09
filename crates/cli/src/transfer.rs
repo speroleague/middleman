@@ -56,6 +56,7 @@ pub fn export(repo: &Path, format: Format) -> Result<(), Error> {
                     score: 1,
                     signals: BTreeSet::new(),
                     stale_penalty: 0,
+                    learned_adjustment: 0,
                 })
                 .collect(),
             excluded: BTreeMap::new(),

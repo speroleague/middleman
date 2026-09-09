@@ -19,12 +19,13 @@ pub mod entity;
 pub mod error;
 pub mod event;
 pub mod ids;
+pub mod learning;
 pub mod projection;
 pub mod proposal;
 pub mod routing;
 pub mod task;
 
-pub use config::Config;
+pub use config::{Config, OptionalAiConfig, OptionalAiMode, WeightConfig};
 pub use entity::{Edge, EdgeKind, Entity, EntityKind, EntityPayload, Evidence, Status};
 pub use error::Error;
 pub use event::{Actor, Claim, ClaimDetails, Event, EventKind, RetrievalSignal};

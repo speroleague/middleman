@@ -17,6 +17,7 @@ use middleman_core::{Config, Event, EventId, Hash, ProjectId, ProposalId, TaskId
 
 mod guides;
 mod index;
+mod learning;
 mod proposals;
 mod retrieval;
 mod tasks;
@@ -72,6 +73,8 @@ enum Commands {
     Restore { path: PathBuf },
     /// Generate repository agent instructions or an observed context map.
     Render(guides::Options),
+    /// Inspect local retrieval outcomes and explicitly apply reviewed tuning.
+    Learn(learning::Options),
     #[command(flatten)]
     Retrieval(retrieval::Commands),
     /// Initialize `.middleman/` in a repository.
@@ -98,6 +101,8 @@ enum Failure {
     Transfer(#[from] transfer::Error),
     #[error("guide: {0}")]
     Guide(#[from] guides::Error),
+    #[error("learning: {0}")]
+    Learning(#[from] learning::Error),
     #[error("retrieval: {0}")]
     Retrieval(#[from] retrieval::Error),
     #[error("`{0}` is not a directory")]
@@ -139,6 +144,7 @@ fn run(cli: &Cli) -> Result<(), Failure> {
         Commands::Backup { path } => transfer::backup(repo, path).map_err(Failure::from),
         Commands::Restore { path } => transfer::restore(repo, path).map_err(Failure::from),
         Commands::Render(options) => guides::run(repo, options).map_err(Failure::from),
+        Commands::Learn(options) => learning::run(repo, options).map_err(Failure::from),
         Commands::Retrieval(command) => retrieval::run(repo, command).map_err(Failure::from),
         Commands::Init { name } => init(repo, name.as_deref()),
         Commands::Status => status(repo),
@@ -371,6 +377,7 @@ pub fn main() -> ExitCode {
                 cli.command,
                 Commands::Retrieval(_)
                     | Commands::Render(_)
+                    | Commands::Learn(_)
                     | Commands::Task(_)
                     | Commands::Index(_)
                     | Commands::Propose(_)
@@ -385,6 +392,7 @@ pub fn main() -> ExitCode {
                 let code = match &failure {
                     Failure::Retrieval(error) => error.code(),
                     Failure::Guide(error) => error.code(),
+                    Failure::Learning(error) => error.code(),
                     Failure::Task(error) => error.code(),
                     Failure::Proposal(error) => error.code(),
                     Failure::Index(error) => error.code(),

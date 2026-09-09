@@ -72,12 +72,40 @@ pub struct IgnoreConfig {
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct WeightConfig {
+    /// Positive signal when a retrieved node overlaps a completed task's files.
     pub test_overlap: f64,
     pub file_overlap: f64,
     pub expanded: f64,
     pub referenced: f64,
     pub accepted: f64,
     pub rejected: f64,
+}
+
+/// The only supported optional-model sources. Middleman never stores
+/// credentials or opens a model connection; callers submit bounded proposals.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OptionalAiMode {
+    Disabled,
+    Harness,
+    Local,
+    Remote,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct OptionalAiConfig {
+    pub enabled: bool,
+    pub mode: OptionalAiMode,
+}
+
+impl Default for OptionalAiConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            mode: OptionalAiMode::Disabled,
+        }
+    }
 }
 
 impl Default for WeightConfig {
@@ -101,6 +129,7 @@ pub struct Config {
     pub limits: LimitsConfig,
     pub ignore: IgnoreConfig,
     pub weight: WeightConfig,
+    pub optional_ai: OptionalAiConfig,
     /// Harness the user most often works with: cline, kilo, pi,
     /// claude-code, codex, or cli.
     pub harness: String,
@@ -114,6 +143,7 @@ impl Default for Config {
             limits: LimitsConfig::default(),
             ignore: IgnoreConfig::default(),
             weight: WeightConfig::default(),
+            optional_ai: OptionalAiConfig::default(),
             harness: "cli".into(),
         }
     }

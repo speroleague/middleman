@@ -286,7 +286,7 @@ fn check_output(output: &OutputOptions) -> Result<(), Error> {
     Ok(())
 }
 
-fn load(repo: &Path, state: State) -> Result<Loaded, Error> {
+pub(super) fn load(repo: &Path, state: State) -> Result<Loaded, Error> {
     let snapshot = Store::open_read_only(&repo.join(super::STATE_DIR))?.index_snapshot()?;
     let previous = snapshot.and_then(|bytes| graph::Index::decode(&bytes).ok());
     Ok(refresh_input(repo, state, true, previous.as_ref())?.loaded)
@@ -378,6 +378,9 @@ pub(super) fn refresh_input(
         for id in &task.scope {
             hints.entry(id.clone()).or_default().recent_task = true;
         }
+    }
+    for (id, adjustment) in middleman_core::learning::adjustments(&state.retrieval, config.weight) {
+        hints.entry(id).or_default().learned_adjustment = adjustment;
     }
     Ok(Refreshed {
         index: refreshed.index,
