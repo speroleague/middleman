@@ -4,6 +4,10 @@ This protocol measures the same task with and without Middleman. It reports
 rendered initial context, task completion, and validation quality separately;
 index/cache work counts are not a proxy for token savings.
 
+Running this benchmark is optional follow-up evidence, not a prerequisite for
+installing or using the Phase 4 adapters. Until a matched run is recorded, make
+no numerical quality or savings claim.
+
 ## Controls
 
 - Use a clean matching checkout for each run, the same harness version and

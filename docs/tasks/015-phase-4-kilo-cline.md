@@ -84,10 +84,12 @@ sequenceDiagram
 - Command: `cargo fmt --all --check`
 - Result: passed (same environment warning only).
 - Baseline / performance evidence: the reproducible matched-task protocol is
-  in `docs/benchmarks/phase-4.md`. No live Kilo/Cline model run is recorded in
-  this workspace, so it makes no completed-quality or savings claim.
+  in `docs/benchmarks/phase-4.md`. Live Kilo/Cline model runs are intentionally
+  deferred; that does not affect the completed local adapter and protocol
+  validation. No completed-quality or savings claim is made until such a run is
+  recorded.
 
 ## Next step / handoff
 
-Validate installation in real Kilo and Cline sessions, then record one matched
-task per harness using the benchmark worksheet.
+Optional follow-up: validate installation in real Kilo and Cline sessions and
+record one matched task per harness using the benchmark worksheet.
