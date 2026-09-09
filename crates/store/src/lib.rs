@@ -278,6 +278,53 @@ impl Store {
         drop(lock);
         Ok(())
     }
+
+    /// Restores a verified archive even when the existing event chain is corrupt.
+    /// Physical `SQLite` corruption is still reported without removing database files.
+    pub fn restore_events(state_dir: &Path, events: &[Event]) -> Result<(), Error> {
+        project_or_corrupt(events)?;
+        std::fs::create_dir_all(state_dir)?;
+        let lock = acquire_write_lock(&state_dir.join(WRITER_LOCK_FILE))?;
+        let conn = Connection::open(state_dir.join(DB_FILE))?;
+        conn.pragma_update(None, "journal_mode", "WAL")?;
+        conn.pragma_update(None, "busy_timeout", BUSY_TIMEOUT_MS)?;
+        migrate(&conn)?;
+        drop(lock);
+        Self {
+            conn,
+            state_dir: state_dir.to_path_buf(),
+        }
+        .replace_events(events)
+    }
+
+    /// Replaces the log and projection only after the complete incoming chain verifies.
+    pub fn replace_events(&self, events: &[Event]) -> Result<(), Error> {
+        let state = project_or_corrupt(events)?;
+        let lock = acquire_write_lock(&self.state_dir.join(WRITER_LOCK_FILE))?;
+        let tx = self.conn.unchecked_transaction()?;
+        tx.execute("DELETE FROM events", [])?;
+        for event in events {
+            tx.execute(
+                "INSERT INTO events(sequence, id, project_id, kind, proposal_id, hash, raw)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                params![
+                    i64::try_from(event.sequence).map_err(|_| Error::Corrupt(
+                        "event sequence does not fit in the store".into()
+                    ))?,
+                    event.id.as_str(),
+                    event.project_id.as_str(),
+                    kind_tag(event),
+                    event.proposal_id.as_ref().map(ProposalId::as_str),
+                    event.hash.to_hex(),
+                    serde_json::to_string(event)?
+                ],
+            )?;
+        }
+        write_state(&tx, &state)?;
+        tx.commit()?;
+        drop(lock);
+        Ok(())
+    }
 }
 
 /// Reads and deserializes the whole event log in sequence order.

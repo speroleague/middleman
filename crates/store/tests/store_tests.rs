@@ -39,6 +39,27 @@ fn read_only_open_does_not_rebuild_or_create_state() {
     assert_eq!(probe, "1");
 }
 
+#[test]
+fn restore_repairs_corrupt_log_and_rejects_invalid_archive() {
+    let dir = tempfile::tempdir().unwrap();
+    let event = init_event();
+    let store = Store::open(dir.path()).unwrap();
+    store.append(&event).unwrap();
+    let mut invalid = event.clone();
+    invalid.hash = Hash::genesis();
+    assert!(store.replace_events(&[invalid]).is_err());
+    assert_eq!(store.events().unwrap(), vec![event.clone()]);
+    drop(store);
+    let conn = rusqlite::Connection::open(dir.path().join("context.sqlite3")).unwrap();
+    conn.execute("UPDATE events SET raw = '{}'", []).unwrap();
+    drop(conn);
+    assert!(Store::open(dir.path()).is_err());
+    Store::restore_events(dir.path(), std::slice::from_ref(&event)).unwrap();
+    let restored = Store::open_read_only(dir.path()).unwrap();
+    assert_eq!(restored.events().unwrap(), vec![event]);
+    assert_eq!(restored.state().unwrap().project_name, "fixture");
+}
+
 fn ulid_bytes(sequence: u64) -> [u8; 16] {
     let mut bytes = [0u8; 16];
     let ts = 1_700_000_000_000u64 + sequence;

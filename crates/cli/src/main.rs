@@ -19,6 +19,7 @@ mod guides;
 mod proposals;
 mod retrieval;
 mod tasks;
+mod transfer;
 
 const STATE_DIR: &str = ".middleman";
 const CONFIG_FILE: &str = "middleman.toml";
@@ -55,6 +56,17 @@ enum Commands {
         #[arg(long)]
         reason: String,
     },
+    /// Write the verified event log as portable JSONL.
+    Export {
+        #[arg(long, value_enum, default_value = "jsonl")]
+        format: transfer::Format,
+    },
+    /// Replace local state from a verified portable JSONL log.
+    Import { path: PathBuf },
+    /// Write a portable event-log backup.
+    Backup { path: PathBuf },
+    /// Restore local state from a portable event-log backup.
+    Restore { path: PathBuf },
     /// Generate repository agent instructions or an observed context map.
     Render(guides::Options),
     #[command(flatten)]
@@ -77,6 +89,8 @@ enum Failure {
     Task(#[from] tasks::Error),
     #[error("proposal: {0}")]
     Proposal(#[from] proposals::Error),
+    #[error("transfer: {0}")]
+    Transfer(#[from] transfer::Error),
     #[error("guide: {0}")]
     Guide(#[from] guides::Error),
     #[error("retrieval: {0}")]
@@ -114,6 +128,10 @@ fn run(cli: &Cli) -> Result<(), Failure> {
         Commands::Reject { id, reason } => {
             proposals::reject(repo, id, reason).map_err(Failure::from)
         }
+        Commands::Export { format } => transfer::export(repo, *format).map_err(Failure::from),
+        Commands::Import { path } => transfer::import(repo, path).map_err(Failure::from),
+        Commands::Backup { path } => transfer::backup(repo, path).map_err(Failure::from),
+        Commands::Restore { path } => transfer::restore(repo, path).map_err(Failure::from),
         Commands::Render(options) => guides::run(repo, options).map_err(Failure::from),
         Commands::Retrieval(command) => retrieval::run(repo, command).map_err(Failure::from),
         Commands::Init { name } => init(repo, name.as_deref()),
@@ -352,12 +370,17 @@ pub fn main() -> ExitCode {
                     | Commands::Review { .. }
                     | Commands::Apply { .. }
                     | Commands::Reject { .. }
+                    | Commands::Export { .. }
+                    | Commands::Import { .. }
+                    | Commands::Backup { .. }
+                    | Commands::Restore { .. }
             ) {
                 let code = match &failure {
                     Failure::Retrieval(error) => error.code(),
                     Failure::Guide(error) => error.code(),
                     Failure::Task(error) => error.code(),
                     Failure::Proposal(error) => error.code(),
+                    Failure::Transfer(error) => error.code(),
                     _ => "invalid_repository",
                 };
                 let report = match &failure {

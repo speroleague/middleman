@@ -52,7 +52,7 @@ apply, reject) with export/import/backup/restore.
 - [x] core: proposal validation
 - [x] cli: propose from-git / structured input
 - [x] cli: review, apply, reject
-- [ ] cli: export, import, backup, restore
+- [x] cli: export, import, backup, restore
 - [ ] cli/store: standalone index command and persistent incremental snapshots
 - [ ] docs: agent guide answers + phase 3-5 handoff (spec 16.2 exit)
 
@@ -92,7 +92,9 @@ apply, reject) with export/import/backup/restore.
   Proposal intake is complete; see [the intake handoff](009-proposal-intake.md) for
   structured input, Git evidence, atomicity and validation. Proposal review is complete;
   see [the lifecycle handoff](010-proposal-review-lifecycle.md) for typed acceptance,
-  rejection and terminal-state rules. Next: export, import, backup, and restore.
+  rejection and terminal-state rules. State transfer is complete; see
+  [the transfer handoff](011-state-transfer.md). Next: standalone indexing and
+  persistent snapshots.
   Standalone index/persistent snapshot work
   is explicitly tracked above before final phase-exit validation.
 
