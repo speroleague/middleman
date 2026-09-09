@@ -2,6 +2,7 @@
 /target/
 **/*.rs.bk
 *.pdb
+**/elm-stuff/
 
 # Middleman broker runtime state (spec 5): never committed, local-only
 /.middleman/
