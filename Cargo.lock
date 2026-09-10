@@ -568,6 +568,7 @@ dependencies = [
  "middleman-store",
  "serde",
  "serde_json",
+ "tempfile",
  "thiserror",
  "tracing",
 ]
