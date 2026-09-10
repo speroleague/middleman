@@ -37,7 +37,12 @@ fn module(path: &str) -> EntityId {
 #[test]
 fn fixture_graphs_have_stable_ids_evidence_and_no_dangling_edges() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures");
-    for fixture in ["rust-workspace", "laravel-app", "elm-frontend"] {
+    for fixture in [
+        "rust-workspace",
+        "laravel-app",
+        "elm-frontend",
+        "react-native-app",
+    ] {
         let files = scan::scan(&root.join(fixture), &Config::default())
             .unwrap()
             .files;
@@ -62,6 +67,44 @@ fn fixture_graphs_have_stable_ids_evidence_and_no_dangling_edges() {
                     && !edge.evidence.is_empty())
         );
         assert!(graph.edges.iter().any(|e| e.kind == EdgeKind::Imports));
+    }
+}
+
+#[test]
+fn framework_fixtures_preserve_language_specific_symbols_and_imports() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures");
+    for (fixture, symbol, from, to) in [
+        (
+            "rust-workspace",
+            "renew",
+            "crates/alpha/src/lib.rs",
+            "crates/alpha/src/frontier.rs",
+        ),
+        (
+            "laravel-app",
+            "PostController",
+            "routes/web.php",
+            "app/Http/Controllers/PostController.php",
+        ),
+        ("react-native-app", "App", "App.tsx", "src/Greeting.tsx"),
+    ] {
+        let files = scan::scan(&root.join(fixture), &Config::default())
+            .unwrap()
+            .files;
+        let graph = build(&files).index.graph().clone();
+        assert!(
+            graph
+                .entities
+                .values()
+                .any(|entity| entity.kind == EntityKind::Symbol && entity.title == symbol),
+            "{fixture}"
+        );
+        assert!(
+            graph.edges.iter().any(|edge| {
+                edge.kind == EdgeKind::Imports && edge.from == module(from) && edge.to == module(to)
+            }),
+            "{fixture}"
+        );
     }
 }
 

@@ -80,3 +80,21 @@ fn incompatible_index_flags_leave_state_unchanged() {
     assert_eq!(store.state().unwrap().last_sequence, 1);
     assert!(store.index_snapshot().unwrap().is_none());
 }
+
+#[test]
+fn status_separates_reviewed_memory_from_the_derived_index() {
+    let repo = tempfile::tempdir().unwrap();
+    init(repo.path(), &["init", "--name", "indexed"]);
+    fs::create_dir(repo.path().join("src")).unwrap();
+    fs::write(repo.path().join("src/lib.rs"), "pub fn stable() {}\n").unwrap();
+    success(repo.path(), &["index", "--full"]);
+
+    let output = run(repo.path(), &["status"]);
+    assert!(output.status.success());
+    let text = String::from_utf8(output.stdout).unwrap();
+    assert!(text.contains("memory:    0 reviewed entities"), "{text}");
+    assert!(
+        text.contains("indexed:   1 modules, 1 symbols, 0 tests, 0 documents"),
+        "{text}"
+    );
+}

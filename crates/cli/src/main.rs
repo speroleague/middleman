@@ -13,7 +13,9 @@ use clap::{Parser, Subcommand};
 use thiserror::Error;
 
 use middleman_core::entity::TaskStatus;
-use middleman_core::{Config, Event, EventId, Hash, ProjectId, ProposalId, TaskId, TaskRecord};
+use middleman_core::{
+    Config, EntityKind, Event, EventId, Hash, ProjectId, ProposalId, TaskId, TaskRecord,
+};
 
 mod guides;
 mod index;
@@ -223,6 +225,7 @@ fn status(repo: &Path) -> Result<(), Failure> {
     let state_dir = require_state_dir(repo)?;
     let store = middleman_store::Store::open(&state_dir)?;
     let state = store.state()?;
+    let indexed = indexed_tally(&store)?;
     let (open, completed, abandoned) = task_tally(&state.tasks);
     let (pending, accepted, rejected) = proposal_tally(&state.proposals);
 
@@ -242,11 +245,52 @@ fn status(repo: &Path) -> Result<(), Failure> {
             .as_deref()
             .unwrap_or("no commit indexed")
     );
-    println!("entities:  {}", state.entities.len());
+    println!("memory:    {} reviewed entities", state.entities.len());
+    match indexed {
+        Some(tally) => println!(
+            "indexed:   {} modules, {} symbols, {} tests, {} documents",
+            tally.modules, tally.symbols, tally.tests, tally.documents
+        ),
+        None => println!("indexed:   unavailable; run middleman index"),
+    }
     println!("edges:     {}", state.edges.len());
     println!("tasks:     {open} open, {completed} completed, {abandoned} abandoned");
     println!("proposals: {pending} pending, {accepted} accepted, {rejected} rejected");
     Ok(())
+}
+
+#[derive(Default)]
+struct IndexedTally {
+    modules: usize,
+    symbols: usize,
+    tests: usize,
+    documents: usize,
+}
+
+fn indexed_tally(store: &middleman_store::Store) -> Result<Option<IndexedTally>, Failure> {
+    let Some(snapshot) = store.index_snapshot()? else {
+        return Ok(None);
+    };
+    let Ok(index) = middleman_indexer::graph::Index::decode(&snapshot) else {
+        return Ok(None);
+    };
+    let mut tally = IndexedTally::default();
+    for entity in index.graph().entities.values() {
+        match entity.kind {
+            EntityKind::Module => tally.modules += 1,
+            EntityKind::Symbol => tally.symbols += 1,
+            EntityKind::Test => tally.tests += 1,
+            EntityKind::Document => tally.documents += 1,
+            EntityKind::Decision
+            | EntityKind::Invariant
+            | EntityKind::Contract
+            | EntityKind::Task
+            | EntityKind::Risk
+            | EntityKind::OpenQuestion
+            | EntityKind::Operation => {}
+        }
+    }
+    Ok(Some(tally))
 }
 
 /// Splits the task records into open, completed, and abandoned counts.
