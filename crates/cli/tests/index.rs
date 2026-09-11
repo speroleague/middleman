@@ -98,3 +98,16 @@ fn status_separates_reviewed_memory_from_the_derived_index() {
         "{text}"
     );
 }
+
+#[test]
+fn status_detects_susumu_without_making_its_optional_digest_a_failure() {
+    let repo = tempfile::tempdir().unwrap();
+    init(repo.path(), &["init", "--name", "susumu fixture"]);
+    fs::write(repo.path().join("susumu.toml"), "[portal]\n").unwrap();
+
+    let output = run(repo.path(), &["status"]);
+    let text = String::from_utf8(output.stdout).unwrap();
+
+    assert!(output.status.success(), "{text}");
+    assert!(text.contains("susumu:    "), "{text}");
+}

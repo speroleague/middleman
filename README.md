@@ -45,6 +45,24 @@ flowchart LR
 | Cline | Project MCP server and repository hooks | Hooks automate prepare, material-work observation, finish, and cancellation | Hooks are supported on macOS/Linux; Windows uses MCP/CLI |
 | Codex and Claude Code | Universal CLI/`AGENTS.md`; optional manual MCP registration | Cooperative | No native Codex or Claude Code adapter is shipped yet |
 
+### Susumu coexistence
+
+When a repository contains a Susumu marker (`susumu.toml`, `.susumu/` review
+artifacts, or an authored `*.susu` sidecar), `middleman status` detects it and
+invokes the installed local `susumu digest . --json` command with a 10-second,
+64-KiB bound. Middleman accepts only Susumu's versioned `susumu.digest.v1`
+contract and renders its native review totals and result. `middleman doctor`
+reports the detected marker.
+
+The two tools retain distinct ownership: Susumu remains the source of truth for
+scanner evidence, workflows, expectations, verification, decisions, work, and
+review threads. Middleman does not parse `.susu` files, write Susumu records,
+or replace Susumu's scanner. Middleman continues to own bounded agent context,
+task lifecycle, and its reviewed broker-memory log. If the `susumu` executable
+is unavailable, too slow, nonzero, oversized, or emits an unsupported digest,
+Middleman reports that native digest is unavailable and otherwise continues
+normally.
+
 The shipped MCP server intentionally exposes only `middleman_prepare`,
 `middleman_expand`, and `middleman_propose`. It also exposes the compact
 `middleman://project/current`, `middleman://task/{id}`, and

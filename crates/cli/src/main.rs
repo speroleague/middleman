@@ -22,6 +22,7 @@ mod index;
 mod learning;
 mod proposals;
 mod retrieval;
+mod susumu;
 mod tasks;
 mod transfer;
 
@@ -256,6 +257,7 @@ fn status(repo: &Path) -> Result<(), Failure> {
     println!("edges:     {}", state.edges.len());
     println!("tasks:     {open} open, {completed} completed, {abandoned} abandoned");
     println!("proposals: {pending} pending, {accepted} accepted, {rejected} rejected");
+    susumu::print_status(repo);
     Ok(())
 }
 
@@ -373,6 +375,17 @@ fn doctor_checks(repo: &Path) -> Vec<(&'static str, bool, String)> {
     match middleman_indexer::git::probe() {
         Ok(version) => checks.push(("git", true, version)),
         Err(e) => checks.push(("git", false, e.to_string())),
+    }
+
+    if let Some(detection) = susumu::detect(repo) {
+        checks.push((
+            "susumu",
+            true,
+            format!(
+                "detected {}; `middleman status` uses the native digest",
+                detection.marker_summary()
+            ),
+        ));
     }
 
     checks
