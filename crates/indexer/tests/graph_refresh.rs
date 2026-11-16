@@ -331,7 +331,7 @@ fn configuration_changes_invalidate_facts_and_cannot_bypass_limits() {
 }
 
 #[test]
-fn cochange_evidence_is_separate_and_has_a_hard_expansion_limit() {
+fn cochange_evidence_is_separate_and_stops_at_its_budget() {
     let files = vec![
         file("a.rs", "fn a() {}"),
         file("b.rs", "fn b() {}"),
@@ -367,19 +367,109 @@ fn cochange_evidence_is_separate_and_has_a_hard_expansion_limit() {
             .iter()
             .any(|e| e.kind == EdgeKind::DependsOn)
     );
-    assert!(
-        graph::refresh(
-            None,
-            &files,
-            Some(&history),
-            &Config::default().limits,
-            Budget {
-                max_cochanges: 1,
-                ..Budget::default()
-            }
-        )
-        .is_err()
+    let limited = graph::refresh(
+        None,
+        &files,
+        Some(&history),
+        &Config::default().limits,
+        Budget {
+            max_cochanges: 1,
+            ..Budget::default()
+        },
+    )
+    .unwrap();
+    assert!(limited.index.graph().cochanges.is_empty());
+    assert!(limited.index.graph().history_truncated);
+}
+
+fn commit(sha: char, paths: &[&str]) -> git::CommitTouch {
+    git::CommitTouch {
+        sha: sha.to_string().repeat(40),
+        paths: paths.iter().map(PathBuf::from).collect(),
+    }
+}
+
+#[test]
+fn wide_commits_are_skipped_and_mark_history_truncated() {
+    let files = vec![
+        file("a.rs", "fn a() {}"),
+        file("b.rs", "fn b() {}"),
+        file("c.rs", "fn c() {}"),
+    ];
+    let budget = Budget {
+        max_commit_paths: 2,
+        ..Budget::default()
+    };
+    let history = git::Snapshot {
+        commits: vec![
+            commit('a', &["a.rs", "b.rs", "c.rs"]),
+            commit('b', &["a.rs", "b.rs"]),
+        ],
+        ..git::Snapshot::default()
+    };
+    let next = graph::refresh(
+        None,
+        &files,
+        Some(&history),
+        &Config::default().limits,
+        budget,
+    )
+    .unwrap();
+    let graph = next.index.graph();
+    assert_eq!(graph.cochanges.len(), 1);
+    assert_eq!(graph.cochanges[0].evidence.len(), 1);
+    assert!(graph.history_truncated);
+
+    let narrow = git::Snapshot {
+        commits: vec![commit('b', &["a.rs", "b.rs"])],
+        ..git::Snapshot::default()
+    };
+    let complete = graph::refresh(
+        None,
+        &files,
+        Some(&narrow),
+        &Config::default().limits,
+        budget,
+    )
+    .unwrap();
+    assert!(!complete.index.graph().history_truncated);
+}
+
+#[test]
+fn cochange_budget_keeps_the_newest_commits() {
+    let files = vec![
+        file("a.rs", "fn a() {}"),
+        file("b.rs", "fn b() {}"),
+        file("c.rs", "fn c() {}"),
+    ];
+    let history = git::Snapshot {
+        commits: vec![
+            commit('a', &["a.rs", "b.rs"]),
+            commit('b', &["b.rs", "c.rs"]),
+        ],
+        ..git::Snapshot::default()
+    };
+    let next = graph::refresh(
+        None,
+        &files,
+        Some(&history),
+        &Config::default().limits,
+        Budget {
+            max_cochanges: 1,
+            ..Budget::default()
+        },
+    )
+    .unwrap();
+    let graph = next.index.graph();
+    assert_eq!(graph.cochanges.len(), 1);
+    assert_eq!(
+        graph.cochanges[0].evidence,
+        vec![Evidence::GitCommit {
+            sha: "a".repeat(40),
+            paths: vec![PathBuf::from("a.rs"), PathBuf::from("b.rs")],
+        }]
     );
+    assert!(graph.history_truncated);
 }
 
 #[test]
