@@ -24,8 +24,12 @@ pub struct Budget {
     pub max_input_bytes: usize,
     pub max_nodes: usize,
     pub max_edges: usize,
-    /// Maximum pair observations across all supplied commits, including repeats.
+    /// Maximum pair observations kept across all supplied commits, including repeats.
+    /// Collection stops at this limit and marks the history truncated.
     pub max_cochanges: usize,
+    /// Commits touching more indexed files than this are skipped as co-change
+    /// evidence and mark the history truncated.
+    pub max_commit_paths: usize,
 }
 
 impl Default for Budget {
@@ -36,6 +40,7 @@ impl Default for Budget {
             max_nodes: 100_000,
             max_edges: 200_000,
             max_cochanges: 10_000,
+            max_commit_paths: 50,
         }
     }
 }
@@ -346,22 +351,26 @@ fn assemble(
     graph.diagnostics.sort();
     graph.diagnostics.dedup();
     if let Some(history) = history {
-        graph.history_truncated = history.history_truncated;
-        graph.cochanges = cochanges(files, history, budget)?;
+        let (cochanges, truncated) = cochanges(files, history, budget)?;
+        graph.history_truncated = history.history_truncated || truncated;
+        graph.cochanges = cochanges;
     }
     Ok(graph)
 }
 
+/// Co-change pairs from the supplied commits, newest first, and whether any
+/// commit was skipped or left out because the budget was reached.
 fn cochanges(
     files: &BTreeMap<PathBuf, Cached>,
     history: &git::Snapshot,
     budget: Budget,
-) -> Result<Vec<CoChange>, Error> {
+) -> Result<(Vec<CoChange>, bool), Error> {
     if history.commits.len() > 1024 {
         return Err(Error::Budget("history"));
     }
     let mut pairs: BTreeMap<(EntityId, EntityId), CoChange> = BTreeMap::new();
     let mut observations = 0usize;
+    let mut truncated = false;
     for commit in &history.commits {
         if !matches!(commit.sha.len(), 40 | 64)
             || !commit.sha.bytes().all(|b| b.is_ascii_hexdigit())
@@ -378,12 +387,17 @@ fn cochanges(
             .collect::<BTreeSet<_>>()
             .into_iter()
             .collect();
+        if paths.len() > budget.max_commit_paths {
+            truncated = true;
+            continue;
+        }
         let count = paths.len().saturating_mul(paths.len().saturating_sub(1)) / 2;
-        observations = observations
-            .checked_add(count)
-            .ok_or(Error::Budget("cochanges"))?;
-        if observations > budget.max_cochanges {
-            return Err(Error::Budget("cochanges"));
+        match observations.checked_add(count) {
+            Some(total) if total <= budget.max_cochanges => observations = total,
+            _ => {
+                truncated = true;
+                break;
+            }
         }
         for (position, left) in paths.iter().enumerate() {
             for right in &paths[position + 1..] {
@@ -408,7 +422,7 @@ fn cochanges(
             }
         }
     }
-    Ok(pairs.into_values().collect())
+    Ok((pairs.into_values().collect(), truncated))
 }
 
 fn path_key(path: &Path) -> Result<String, Error> {
